@@ -1049,7 +1049,7 @@ export default function TeacherPage() {
       <div className="ov" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowHoursPopup(false)}>
         <div className="card" style={{ maxWidth: 420, width: '100%', margin: 0, maxHeight: '85vh', overflow: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
           <button type="button" aria-label="關閉" onClick={() => setShowHoursPopup(false)}
-            style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--muted)', fontSize: '1.1rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, border: 0, background: 'none', color: 'var(--muted)', fontSize: '1.5rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
           <b style={{ fontSize: '1.1rem', display: 'block', paddingRight: 36 }}>{hoursPopupKind === 'opened' ? `🎉 已開放 ${+curYm.slice(5)} 月選課！` : `✅ ${+curYm.slice(5)} 月上班時段已更新`}</b>
           <p className="hint">把下面這段最新的訊息傳給學生，{hoursPopupKind === 'opened' ? '讓他們知道可以開始選時間了' : '確保他們看到的時段是最新的'}。</p>
           <EditableMsg
