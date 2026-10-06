@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>老師管理（預覽）</title>
+<style>
+:root{--bg:#f2f4f3;--ink:#17323a;--muted:#5d7178;--line:#d5dcdb;--on:#2a7f78;--onink:#fff;--warn:#a4452c;--card:#fff;--soft:#e3efed;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b1e;--ink:#e6eeee;--muted:#93a8ac;--line:#2a3b3f;--on:#4fb3a9;--onink:#06201e;--warn:#e58a6f;--card:#16262a;--soft:#1d3a3a}}
+:root[data-theme="dark"]{--bg:#0f1b1e;--ink:#e6eeee;--muted:#93a8ac;--line:#2a3b3f;--on:#4fb3a9;--onink:#06201e;--warn:#e58a6f;--card:#16262a;--soft:#1d3a3a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:16px 16px calc(40px + env(safe-area-inset-bottom,0px))}
+h1{font-size:1.35rem;margin:0}.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.pill{font-size:.8rem;padding:2px 10px;border-radius:99px;background:var(--soft)}
+.note{border:1px dashed var(--line);border-radius:10px;padding:6px 12px;font-size:.8rem;color:var(--muted);margin:6px 0 12px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px}
+button,select,input{font:inherit;color:var(--ink)}
+.tab{min-height:40px;padding:0 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:600}
+.btn{min-height:42px;padding:0 16px;border-radius:10px;border:1px solid var(--on);background:var(--card);color:var(--on);cursor:pointer;font-weight:600}
+.btn.pri{background:var(--on);color:var(--onink)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:14px}
+.wr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid var(--line)}
+.m,.hint{color:var(--muted);font-size:.85rem}
+select,input[type=date]{min-height:36px;border-radius:8px;border:1px solid var(--line);background:var(--card);padding:0 6px}
+.tag{border:1px solid var(--line);background:var(--soft);border-radius:99px;padding:2px 10px;cursor:pointer;margin-right:4px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px 4px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
+.wh{display:flex;justify-content:space-between;margin:14px 0 4px;font-weight:600}
+textarea{width:100%;resize:none;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px;font:inherit;font-size:.88rem}
+.warn{color:var(--warn)}.msg{white-space:pre-wrap;font-size:.9rem;background:var(--soft);border-radius:8px;padding:8px 12px;margin:6px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+:focus-visible{outline:3px solid var(--on);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1>老師管理 · 10 月排課</h1><span class="pill" id="st"></span></div>
+  <div class="note">預覽版：示範資料（5 位學生、Joanna 與 Coco），不會真的發送 LINE 訊息，重新整理後會還原。</div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div id="view"></div>
+</main>
+
+<script id="engine">
+var FROM='2026-10-01',TO='2026-10-31',L=60,OPEN=600,LAST=1260;
+var BLK=[{wd:3,s:960,e:1020}];
+var WD='日一二三四五六';
+function add(d,n){var t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)}
+function wd(d){return new Date(d+'T00:00:00Z').getUTCDay()}
+function wk(d){return add(d,-((wd(d)+6)%7))}
+function md(d){return(+d.slice(5,7))+'/'+(+d.slice(8))}
+function hm(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
+function mk(days,f,t){var p={};[0,1,2,3,4,5,6].forEach(function(w){p[w]=days.indexOf(w)>=0?[f,t]:null});return p}
+var T=[{id:'joanna',name:'Joanna',pat:mk([0,1,2,3,4,5,6],780,1320),off:[]},
+       {id:'coco',name:'Coco',pat:mk([1,2,3,4,5],600,1080),off:[]}];
+var S=[{id:'s1',name:'Amy',pri:'joanna',days:[1,2,3,4],f:1140,t:1320,desc:'週一至週四 19:00 後'},
+       {id:'s2',name:'Bella',pri:'joanna',days:[1,3,5],f:1080,t:1260,desc:'週一、三、五 18:00–21:00'},
+       {id:'s3',name:'Cindy',pri:'joanna',days:[2,4],f:1140,t:1260,desc:'週二、四 19:00–21:00'},
+       {id:'s4',name:'Dora',pri:'joanna',days:[1,2,3,4,5],f:600,t:840,desc:'週一至週五 10:00–14:00'},
+       {id:'s5',name:'Emma',pri:'joanna',days:[6,0],f:780,t:1080,desc:'週末 13:00–18:00'}];
+var today=new Date(Date.now()+8*3600e3).toISOString().slice(0,10);
+var START=today>FROM?add(wk(today),7):FROM; // 示範：從下週一開始排，避免已過去的日期
+var lessons=[],unas=[],uid=0;
+function inAv(st,d,s){return st.days.indexOf(wd(d))>=0&&s>=st.f&&s+L<=st.t}
+function free(t,d,s,ign){
+  var p=t.pat[wd(d)];
+  if(!p||s<p[0]||s+L>p[1]||t.off.indexOf(d)>=0)return false;
+  if(BLK.some(function(b){return b.wd===wd(d)&&s<b.e&&b.s<s+L}))return false;
+  return !lessons.some(function(l){return l.id!==ign&&l.tid===t.id&&l.d===d&&l.s<s+L&&s<l.s+L});
+}
+function cands(st,w){
+  var out=[],ord=T.slice().sort(function(a,b){return(a.id===st.pri?-1:0)-(b.id===st.pri?-1:0)});
+  for(var i=0;i<7;i++){var d=add(w,i);if(d<START||d>TO)continue;
+    for(var s=OPEN;s<=LAST;s+=L)if(inAv(st,d,s))ord.forEach(function(t,ti){
+      if(free(t,d,s))out.push({k:t.id+'|'+d+'|'+s,r:ti,d:d,s:s})})}
+  return out.sort(function(a,b){return a.r-b.r||a.d.localeCompare(b.d)||a.s-b.s});
+}
+function runSched(){
+  lessons=lessons.filter(function(l){return l.locked});unas=[];
+  for(var w=wk(START);w<=TO;w=add(w,7)){
+    var seats=[];
+    S.forEach(function(st){if(lessons.some(function(l){return l.sid===st.id&&wk(l.d)===w}))return;seats.push({st:st,c:cands(st,w)})});
+    seats.sort(function(a,b){return a.c.length-b.c.length});
+    var owner={},m={};
+    var tryA=function(i,vis){var c=seats[i].c;for(var j=0;j<c.length;j++){var k=c[j].k;if(vis[k])continue;vis[k]=1;
+      var o=owner[k];if(o===undefined||tryA(o,vis)){owner[k]=i;return true}}return false};
+    seats.forEach(function(x,i){if(tryA(i,{}))m[i]=1});
+    Object.keys(owner).forEach(function(k){var p=k.split('|');lessons.push({id:++uid,sid:seats[owner[k]].st.id,tid:p[0],d:p[1],s:+p[2],locked:false})});
+    seats.forEach(function(x,i){if(!m[i])unas.push({sid:x.st.id,w:w,why:x.c.length?'可選時段已被其他學生佔用':'沒有與老師上班時間重疊的時段'})});
+  }
+  lessons.sort(function(a,b){return a.d.localeCompare(b.d)||a.s-b.s});
+}
+</script>
+
+<script>
+var tab='hours',status='collecting',stale=false,notified={};
+var TABS=[['hours','上班時間'],['students','學生時段'],['plan','排課'],['notify','通知']];
+var STN={collecting:'收集中',draft:'草稿',approved:'已核准',notified:'已通知'};
+var $=function(id){return document.getElementById(id)};
+var tn=function(id){return T.filter(function(t){return t.id===id})[0]};
+var sn=function(id){return S.filter(function(s){return s.id===id})[0]};
+function opts(a,b,cur){var h='';for(var m=a;m<=b;m+=60)h+='<option value="'+m+'"'+(m===cur?' selected':'')+'>'+hm(m)+'</option>';return h}
+
+function hoursMsg(){
+  var order=[1,2,3,4,5,6,0];
+  return T.map(function(t){
+    var runs=[];
+    order.forEach(function(w){var p=t.pat[w];if(!p)return;var last=runs[runs.length-1],key=p[0]+'-'+p[1];
+      if(last&&last.key===key&&last.ws[last.ws.length-1]===order[order.indexOf(w)-1])last.ws.push(w);else runs.push({key:key,p:p,ws:[w]})});
+    var ls=runs.map(function(r){var n=r.ws.length,ws=r.ws;
+      var lab=n===1?'週'+WD[ws[0]]:n===2?'週'+WD[ws[0]]+'、週'+WD[ws[1]]:'週'+WD[ws[0]]+'至週'+WD[ws[n-1]];
+      return lab+' '+hm(r.p[0])+'–'+hm(r.p[1])+'（最後一堂 '+hm(r.p[1]-L)+' 開始）'});
+    return '👩🏻 '+t.name+' 10 月可預約時段\n'+(ls.join('\n')||'本月無上班')+(t.off.length?'\n🚫 休假（無法預約）：'+t.off.map(md).join('、'):'');
+  }).join('\n\n')+'\n\n🚫 固定無法預約：每週三 16:00–17:00（公司開會）';
+}
+function tHours(){
+  var h='<p class="hint">設定每位老師這個月的上班時間。每週三 16:00–17:00 是全工作室固定封鎖。</p>';
+  T.forEach(function(t){
+    h+='<div class="card"><b>'+t.name+'</b>';
+    [1,2,3,4,5,6,0].forEach(function(w){var p=t.pat[w];
+      h+='<div class="wr"><label><input type="checkbox" data-a="on" data-t="'+t.id+'" data-w="'+w+'"'+(p?' checked':'')+'> 週'+WD[w]+'</label>'+
+        (p?'<span><select aria-label="開始" data-a="f" data-t="'+t.id+'" data-w="'+w+'">'+opts(OPEN,1260,p[0])+'</select> – <select aria-label="結束" data-a="e" data-t="'+t.id+'" data-w="'+w+'">'+opts(OPEN+60,1320,p[1])+'</select></span>':'<span class="m">休息</span>')+'</div>'});
+    h+='<div class="wr"><span>休假日</span><span>'+t.off.map(function(d){return '<button class="tag" data-a="rm" data-t="'+t.id+'" data-d="'+d+'">'+md(d)+' ✕</button>'}).join('')+
+      '<input type="date" id="off-'+t.id+'" min="'+FROM+'" max="'+TO+'" aria-label="休假日期"> <button class="btn" data-a="addoff" data-t="'+t.id+'">新增休假</button></span></div></div>'});
+  h+='<div class="card"><b>發給學生的本月上班時間</b><p class="hint">會隨上方的上班時間與休假自動更新。</p><textarea id="hm" readonly rows="'+(hoursMsg().split('\n').length+1)+'">'+hoursMsg()+'</textarea><div class="row"><button class="btn" data-a="copy">複製訊息</button></div></div>';
+  return h;
+}
+function tStudents(){
+  var h='<p class="hint">學生在 LINE 勾選的可上課時段（示範資料）。</p><div class="card"><table><tr><th>學生</th><th>主要老師</th><th>可上課時段</th><th>每週可選</th></tr>';
+  S.forEach(function(s){var n=0;for(var s2=OPEN;s2<=LAST;s2+=L)if(s.days.length&&s2>=s.f&&s2+L<=s.t)n++;
+    h+='<tr><td>'+s.name+'</td><td>'+tn(s.pri).name+'</td><td>'+s.desc+'</td><td>'+n*s.days.length+' 格</td></tr>'});
+  return h+'</table></div>';
+}
+function tPlan(){
+  var lock=status==='approved'||status==='notified';
+  var j=lessons.filter(function(l){return l.tid==='joanna'}).length;
+  var h='<div class="row"><button class="btn pri" data-a="run"'+(lock?' disabled':'')+'>自動排課</button><button class="btn" data-a="approve"'+(!lessons.length||lock?' disabled':'')+'>核准課表</button>'+
+    (lock&&status!=='notified'?'<button class="btn" data-a="reopen">退回修改</button>':'')+'</div>';
+  if(stale&&!lock)h+='<p class="warn">上班時間已變更，建議重新排課（已鎖定的課會保留）。</p>';
+  if(!lessons.length&&!unas.length)return h+'<p class="hint">按「自動排課」產生草稿。排課順序：Joanna 優先，無法配合時直接安排 Coco。</p>';
+  h+='<p>共排入 <b>'+lessons.length+'</b> 堂（Joanna '+j+'、Coco '+(lessons.length-j)+'）'+(unas.length?'，<span class="warn">未排入 '+unas.length+' 位次</span>':'，全部學生都已排入')+'</p>';
+  var cur='';
+  lessons.forEach(function(l){var w=wk(l.d);
+    if(w!==cur){if(cur)h+='</table></div>';cur=w;h+='<div class="wh"><span>'+md(w)+' 起這週</span></div><div class="card"><table>'}
+    h+='<tr><td>'+md(l.d)+'（'+WD[wd(l.d)]+'）</td><td>'+hm(l.s)+'</td><td>'+sn(l.sid).name+'</td><td><select aria-label="授課老師" data-a="tid" data-id="'+l.id+'"'+(lock?' disabled':'')+'>'+
+      T.map(function(t){return '<option value="'+t.id+'"'+(t.id===l.tid?' selected':'')+'>'+t.name+'</option>'}).join('')+'</select></td>'+
+      '<td><label><input type="checkbox" data-a="lock" data-id="'+l.id+'"'+(l.locked?' checked':'')+(lock?' disabled':'')+'> 鎖定</label></td></tr>'});
+  if(cur)h+='</table></div>';
+  if(unas.length){h+='<div class="card"><b class="warn">需要你另外聯絡</b><table>';
+    unas.forEach(function(u){h+='<tr><td>'+sn(u.sid).name+'</td><td>'+md(u.w)+' 起這週</td><td>'+u.why+'</td></tr>'});h+='</table></div>'}
+  return h;
+}
+function tNotify(){
+  if(status!=='approved'&&status!=='notified')return '<p class="hint">請先在「排課」頁核准課表，核准後才會產生學生通知。</p>';
+  var h='<p class="hint">每位學生會在 LINE 收到自己的課表，不會傳到群組。</p>';
+  S.forEach(function(s){
+    var ls=lessons.filter(function(l){return l.sid===s.id});
+    h+='<div class="card"><b>'+s.name+'</b>'+(notified[s.id]?' <span class="pill">已通知</span>':'')+'<div class="msg">'+s.name+' 你好 🌸\n這是你 10 月的上課時間：\n'+
+      ls.map(function(l){return md(l.d)+'（'+WD[wd(l.d)]+'）'+hm(l.s)+'–'+hm(l.s+L)+'　'+tn(l.tid).name+' 老師'}).join('\n')+'\n如需調整請直接回覆我，謝謝！🫶🏻</div></div>'});
+  return h+'<div class="row"><button class="btn pri" data-a="send"'+(status==='notified'?' disabled':'')+'>模擬推播給全部學生</button></div>';
+}
+function render(){
+  $('st').textContent='目前狀態：'+STN[status];
+  $('tabs').innerHTML=TABS.map(function(t){return '<button class="tab" role="tab" data-tab="'+t[0]+'" aria-selected="'+(tab===t[0])+'">'+t[1]+'</button>'}).join('');
+  var y=window.scrollY;
+  $('view').innerHTML={hours:tHours,students:tStudents,plan:tPlan,notify:tNotify}[tab]();
+  window.scrollTo(0,y);
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;var a=b.dataset.a,t=b.dataset.t&&tn(b.dataset.t);
+  if(b.dataset.tab){tab=b.dataset.tab;return render()}
+  if(a==='addoff'){var v=$('off-'+t.id).value;if(v&&t.off.indexOf(v)<0){t.off.push(v);t.off.sort();stale=true}}
+  else if(a==='rm'){t.off=t.off.filter(function(d){return d!==b.dataset.d});stale=true}
+  else if(a==='copy'){try{navigator.clipboard.writeText($('hm').value);b.textContent='已複製'}catch(x){$('hm').select();b.textContent='請按 Ctrl+C 複製'}return}
+  else if(a==='run'){runSched();status='draft';stale=false}
+  else if(a==='approve'){if(unas.length&&!confirm('還有 '+unas.length+' 位次未排入，仍要核准嗎？'))return;status='approved'}
+  else if(a==='reopen'){status='draft'}
+  else if(a==='send'){S.forEach(function(s){notified[s.id]=1});status='notified'}
+  else return;
+  render();
+});
+document.addEventListener('change',function(e){
+  var el=e.target,a=el.dataset.a;if(!a)return;
+  if(a==='tid'){var l=lessons.filter(function(x){return x.id==+el.dataset.id})[0],t=tn(el.value);
+    if(!free(t,l.d,l.s,l.id)){alert(t.name+' 在 '+md(l.d)+' '+hm(l.s)+' 不能上課（不在上班時間、休假、開會或已有課）。');return render()}
+    l.tid=t.id;return render()}
+  if(a==='lock'){lessons.filter(function(x){return x.id==+el.dataset.id})[0].locked=el.checked;return render()}
+  var t=tn(el.dataset.t),w=+el.dataset.w;
+  if(a==='on')t.pat[w]=el.checked?[780,1320]:null;
+  else if(a==='f'){t.pat[w][0]=+el.value;if(t.pat[w][1]<=t.pat[w][0])t.pat[w][1]=t.pat[w][0]+60}
+  else if(a==='e'){t.pat[w][1]=+el.value;if(t.pat[w][0]>=t.pat[w][1])t.pat[w][0]=t.pat[w][1]-60}
+  stale=true;render();
+});
+render();
+</script>
+</body>
+</html>

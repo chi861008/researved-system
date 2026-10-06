@@ -1,0 +1,14 @@
+const {JSDOM}=require('jsdom');const fs=require('fs');
+const dom=new JSDOM(fs.readFileSync(require('path').join(__dirname,'../../prototype/scheduler-grid-preview.html'),'utf8'),{url:'https://x.test/',runScripts:'dangerously',pretendToBeVisual:true,beforeParse(w){w.scrollTo=()=>{}}});
+const w=dom.window,d=w.document;
+const click=s=>{const e=d.querySelector(s);if(!e)throw new Error('missing '+s);e.click()};
+const setSel=(s,v)=>{const e=d.querySelector(s);e.value=v;e.dispatchEvent(new w.Event('change',{bubbles:true}))};
+click('[data-a=role][data-r=teacher]');
+setSel('[data-a=la]','2026-10-05');setSel('[data-a=lb]','2026-10-11');click('[data-a=leave]');
+click('[data-a=tab][data-t=plan]');click('[data-a=run]');
+console.log('待補:',d.querySelectorAll('[data-a=fill]').length);
+d.querySelectorAll('[data-a=fill]')[1].click();
+console.log('學生選過的時段:',[...d.querySelectorAll('[data-a=pk]')].slice(0,3).map(e=>e.textContent));
+d.querySelector('[data-a=pk]').click();
+const e=d.getElementById('tn');e.value='Coco';e.dispatchEvent(new w.Event('input',{bubbles:true}));
+click('[data-a=sok]');console.log(d.querySelector('.toast').textContent,'| 待補剩:',d.querySelectorAll('[data-a=fill]').length);

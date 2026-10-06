@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIFF 連線測試</title>
+<style>
+body{font:16px/1.7 system-ui,"Noto Sans TC","PingFang TC",sans-serif;max-width:480px;margin:0 auto;padding:20px;color:#17323a;background:#f2f4f3}
+h1{font-size:1.3rem;margin:0 0 12px}
+.card{background:#fff;border:1px solid #d5dcdb;border-radius:12px;padding:12px 16px;margin:10px 0}
+.ok{color:#2a7f78;font-weight:700}.bad{color:#a4452c;font-weight:700}
+.row{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px solid #e6ebea}
+.row:first-child{border-top:0}.row span:first-child{color:#5d7178}
+img{width:64px;height:64px;border-radius:50%;display:block;margin-bottom:8px}
+</style>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+<h1>LIFF 連線測試</h1>
+<div id="out" class="card">載入中…</div>
+<script>
+// 1) 把 LINE Developers 後台 LIFF 頁面上的 LIFF ID 貼在下面（格式像 1234567890-AbCdEfGh）
+var LIFF_ID = '2011846915-745eh6xt';
+
+var out = document.getElementById('out');
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function row(k,v){return '<div class="row"><span>'+k+'</span><span>'+esc(v)+'</span></div>'}
+function fail(msg){out.innerHTML='<p class="bad">連線失敗</p><p>'+esc(msg)+'</p>'}
+
+if (LIFF_ID.indexOf('貼在這裡') >= 0) {
+  fail('還沒有填 LIFF ID。請編輯 index.html 最上面的 LIFF_ID，再重新上傳。');
+} else {
+  liff.init({ liffId: LIFF_ID }).then(async function () {
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    var p = await liff.getProfile();
+    var friend = '無法判斷（尚未連結官方帳號）';
+    try { friend = (await liff.getFriendship()).friendFlag ? '是' : '否（請先加官方帳號好友）'; } catch (e) {}
+    out.innerHTML =
+      '<p class="ok">✅ 連線成功</p>' +
+      (p.pictureUrl ? '<img src="'+esc(p.pictureUrl)+'" alt="">' : '') +
+      row('LINE 名稱', p.displayName) +
+      row('使用者 ID', p.userId.slice(0,6)+'…'+p.userId.slice(-4)) +
+      row('在 LINE 內開啟', liff.isInClient() ? '是' : '否（外部瀏覽器）') +
+      row('已加官方帳號好友', friend) +
+      row('系統', liff.getOS()) +
+      row('語言', liff.getLanguage());
+  }).catch(function (e) { fail((e && e.message) ? e.message : String(e)); });
+}
+</script>
+</body>
+</html>

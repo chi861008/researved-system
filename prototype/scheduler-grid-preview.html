@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>皮拉提斯排課（格狀版預覽）</title>
+<style>
+:root{--bg:#f2f4f3;--ink:#17323a;--muted:#5d7178;--line:#d5dcdb;--on:#2a7f78;--onink:#fff;--warn:#a4452c;--card:#fff;--soft:#e3efed;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b1e;--ink:#e6eeee;--muted:#93a8ac;--line:#2a3b3f;--on:#4fb3a9;--onink:#06201e;--warn:#e58a6f;--card:#16262a;--soft:#1d3a3a}}
+:root[data-theme="dark"]{--bg:#0f1b1e;--ink:#e6eeee;--muted:#93a8ac;--line:#2a3b3f;--on:#4fb3a9;--onink:#06201e;--warn:#e58a6f;--card:#16262a;--soft:#1d3a3a}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:8px 14px calc(150px + env(safe-area-inset-bottom,0px))}
+button,select,textarea{font:inherit;color:var(--ink)}button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+h1{font-size:1.3rem;margin:8px 0 4px}.sub,.hint,.m{color:var(--muted);font-size:.88rem;margin:2px 0 8px}
+.role{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:6px;padding:8px 0}
+.role button{flex:1;min-height:44px;border:1px solid var(--line);background:var(--card);border-radius:10px}
+.role button[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0}
+details.card summary{font-weight:700;min-height:28px;cursor:pointer}details ul{margin:6px 0 0;padding-left:18px;font-size:.9rem}
+.sec{font-weight:700;margin:18px 0 2px}
+.pills{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.pill{min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);font-weight:700}
+.pill.on{background:var(--on);border-color:var(--on);color:var(--onink)}.pill.range{border-color:var(--on);color:var(--on);background:var(--soft)}
+.pill.off{border-color:var(--warn);color:var(--warn);text-decoration:line-through}.pill.cur{outline:3px solid var(--on);outline-offset:2px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.seg button,.btn{min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.seg button[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:600}
+.seg button.n[aria-pressed="true"]{background:var(--warn);border-color:var(--warn)}
+.rng{display:flex;gap:8px;align-items:center;margin-top:10px}.rng select,select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);padding:0 8px;font-size:16px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px}.cal i{text-align:center;font-style:normal;color:var(--muted);font-size:.8rem}
+.wd{min-height:46px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font-weight:700;padding:0}
+.wd.on{background:var(--on);border-color:var(--on);color:var(--onink)}.wd.part{background:var(--soft);border-color:var(--on);color:var(--on)}.wd.cur{outline:3px solid var(--on);outline-offset:2px}
+.wbar{display:flex;gap:8px;align-items:center;margin:10px 0 2px}.wbar b{flex:0 0 auto}.wbar .btn{flex:1}.wbar .btn[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:700}.wbar .btn.n[aria-pressed="true"]{background:var(--warn);border-color:var(--warn)}
+.cell.hl{border-color:var(--on);border-style:dashed}
+.cell{min-height:50px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;padding:0}
+.cell small{font-size:.72rem;color:var(--muted);min-height:.9rem}.cell.on{background:var(--soft);border-color:var(--on)}.cell.on small{color:var(--on);font-weight:700}
+.cell.cur{outline:3px solid var(--on);outline-offset:1px}.cell:disabled{opacity:.35}
+.wnav{display:flex;align-items:center;justify-content:space-between;margin:8px 0}.wnav button{min-width:52px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:1.3rem}.wnav button:disabled{opacity:.35}
+.grid{display:grid;grid-template-columns:50px repeat(7,1fr);gap:3px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.gh{min-height:38px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.8rem;padding:0;line-height:1.1}.gh small{display:block;color:var(--muted);font-size:.66rem}.gh:disabled{opacity:.35}
+.gc{min-height:36px;border-radius:6px;border:1px solid var(--line);background:var(--card);padding:0}.gc.on{background:var(--on);border-color:var(--on)}.gc.out{border-style:dashed}.gc:disabled{opacity:.3;background:transparent}
+.scope{display:grid;grid-template-columns:1fr 1fr;gap:6px}.scope button{min-height:54px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);font-weight:700;line-height:1.25}
+.scope small{display:block;font-weight:400;font-size:.72rem;color:var(--muted)}.scope button[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink)}.scope button[aria-pressed="true"] small{color:var(--onink)}
+.scope button[data-v="week"][aria-pressed="true"]{background:var(--warn);border-color:var(--warn)}
+.grid.gm{outline:2px solid var(--on);outline-offset:5px;border-radius:6px}.grid.gw{outline:2px dashed var(--warn);outline-offset:5px;border-radius:6px}
+.toast{background:var(--soft);border-radius:10px;padding:6px 12px;font-size:.88rem;margin:6px 0}
+.tin{width:100%;min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 10px;font-size:16px}
+.tagp{display:inline-flex;border:1px solid var(--line);border-radius:99px;overflow:hidden;background:var(--card)}.tagp .tag{border:0;border-radius:0}.tagx{border:0;border-left:1px solid var(--line);background:none;min-width:42px;color:var(--muted)}
+.li{flex-wrap:wrap}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tag{min-height:40px;border-radius:99px;border:1px solid var(--line);background:var(--card);padding:0 14px}.tag[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink)}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slots button{min-height:46px;border-radius:10px;border:1.5px solid var(--line);background:var(--card)}.slots button[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:700}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--card);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px));max-height:78vh;overflow:auto;max-width:520px;margin:0 auto}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.chip{min-height:48px;border-radius:10px;border:1.5px solid var(--line);background:var(--card)}
+.chip[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:700}
+.chip.out{border-style:dashed}.chip:disabled{opacity:.35;text-decoration:line-through}
+.row{display:flex;gap:8px}.row .btn{flex:1}.btn.pri{background:var(--on);border-color:var(--on);color:var(--onink);font-weight:700}.btn:disabled{opacity:.4}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:1px solid var(--line);padding:8px 14px calc(8px + env(safe-area-inset-bottom,0px))}
+.bar>div{max-width:520px;margin:0 auto}.bar label{display:flex;gap:8px;font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr)}.tabs button{min-height:52px;border:0;background:none;font-size:.95rem}
+.tabs button[aria-selected="true"]{color:var(--on);font-weight:700;box-shadow:inset 0 3px 0 var(--on)}
+.warn{color:var(--warn)}textarea{width:100%;resize:none;border-radius:10px;border:1px solid var(--line);background:var(--card);padding:8px;font-size:.9rem}
+.msg{white-space:pre-wrap;font-size:.9rem;background:var(--soft);border-radius:10px;padding:8px 12px;margin:6px 0}
+.li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:.92rem}
+.li button{min-height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.85rem}
+.wh{font-weight:700;margin:14px 0 2px}.pillt{font-size:.78rem;padding:2px 10px;border-radius:99px;background:var(--soft)}
+:focus-visible{outline:3px solid var(--on);outline-offset:2px}
+</style>
+</head>
+<body>
+<main><div class="role" id="role"></div><div id="view"></div></main>
+<div id="foot"></div><div id="sheet"></div>
+<script>
+var FROM='2026-10-01',TO='2026-10-31',L=60,OPEN=600,LAST=1260,BLK=[{wd:3,s:960,e:1020}];
+var WD='日一二三四五六',ORD=[1,2,3,4,5,6,0];
+var add=(d,n)=>{var t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
+var wd=d=>new Date(d+'T00:00:00Z').getUTCDay(),wk=d=>add(d,-((wd(d)+6)%7)),md=d=>(+d.slice(5,7))+'/'+(+d.slice(8));
+var hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+var today=new Date(Date.now()+8*3600e3).toISOString().slice(0,10);
+var START=today>FROM?add(wk(today),7):FROM;
+var blocked=(d,s)=>BLK.some(b=>b.wd===wd(d)&&s<b.e&&b.s<s+L),okS=(d,s)=>d>=today&&!blocked(d,s);
+var starts=[],dates=[];for(var s=OPEN;s<=LAST;s+=L)starts.push(s);for(var d=FROM;d<=TO;d=add(d,1))dates.push(d);
+var wks=[];dates.forEach(d=>{if(!wks.includes(wk(d)))wks.push(wk(d))});var wi0=Math.max(0,wks.findIndex(w=>[0,1,2,3,4,5,6].filter(i=>add(w,i)>=today&&add(w,i)<=TO).length>=3));
+var mkP=()=>({sel:new Set(),day:null,wi:wi0,scope:'month'});var toast='',notice='',pendAppr=false,outs=[];var LV={a:null,b:null};
+var TP=mkP(),SP=mkP();
+dates.forEach(d=>starts.forEach(s=>{if(s>=780&&okS(d,s))TP.sel.add(d+'|'+s)}));
+var STU=[{id:'s1',name:'Amy',sel:SP.sel},{id:'s2',name:'Bella',pat:[[1,3,5],1080,1260],sel:new Set()},{id:'s3',name:'Cindy',pat:[[2,4],1140,1260],sel:new Set()},{id:'s4',name:'Dora',pat:[[1,2,3,4,5],600,840],sel:new Set()},{id:'s5',name:'Emma',pat:[[6,0],780,1080],sel:new Set()}];
+function seedOthers(){STU.forEach(st=>{if(!st.pat)return;dates.forEach(d=>{if(st.pat[0].includes(wd(d)))starts.forEach(s=>{if(s>=st.pat[1]&&s+L<=st.pat[2]&&okS(d,s))st.sel.add(d+'|'+s)})})})}
+seedOthers();
+var role='student',tab='hours',status='collecting',stale=false,lessons=[],unas=[],uid=0,notified=0,consent=false,sent='';
+var ACTP=null,AS=null,PROXY={},NS='',pendHide=null;
+var P_=p=>p==='t'?TP:p==='a'?ACTP:SP;
+// ---- 每月選課週期 ----
+var STN={collecting:'收集中',draft:'草稿',approved:'已核准',notified:'已通知'};
+var PER={'2026-10':{status:'collecting',lessons:[],unas:[],notified:0,log:[],deadline:'2026-10-10'}},curYm='2026-10',tYm='2026-10';
+var ymEnd=ym=>new Date(Date.UTC(+ym.slice(0,4),+ym.slice(5),0)).toISOString().slice(0,10);
+var nextYm=ym=>{var y=+ym.slice(0,4),m=+ym.slice(5)+1;if(m>12){m=1;y++}return y+'-'+String(m).padStart(2,'0')};
+var monthDates=ym=>{var o=[];for(var d=ym+'-01';d<=ymEnd(ym);d=add(d,1))o.push(d);return o};
+var ymLabel=ym=>ym.slice(0,4)+' 年 '+(+ym.slice(5))+' 月',mon=ym=>+ym.slice(5);
+var nowStr=()=>new Date(Date.now()+8*3600e3).toISOString().slice(5,16).replace('T',' ');
+function setRange(ym){FROM=ym+'-01';TO=ymEnd(ym);dates.length=0;monthDates(ym).forEach(d=>dates.push(d));wks.length=0;dates.forEach(d=>{if(!wks.includes(wk(d)))wks.push(wk(d))});START=today>FROM?add(wk(today),7):FROM}
+var firstWeek=()=>Math.max(0,wks.findIndex(w=>[0,1,2,3,4,5,6].filter(i=>add(w,i)>=today&&add(w,i)>=FROM&&add(w,i)<=TO).length>=3));
+function savePer(){var p=PER[curYm];p.status=status;p.lessons=lessons;p.unas=unas;p.notified=notified;p.log=log}
+function useMonth(ym){savePer();curYm=ym;var p=PER[ym];status=p.status;lessons=p.lessons;unas=p.unas;notified=p.notified;log=p.log;setRange(ym);TP.wi=SP.wi=firstWeek();TP.day=SP.day=null;SH=null;AS=null;LV.a=LV.b=null}
+var statusOf=ym=>ym===curYm?status:PER[ym].status;
+var openYm=()=>Object.keys(PER).sort().filter(y=>statusOf(y)==='collecting')[0]||null;
+var monthCount=P=>[...P.sel].filter(k=>k.slice(0,7)===curYm).length;
+var filled=st=>[...st.sel].some(k=>k.slice(0,7)===curYm);
+// 沿用上個月的每週規律：每個「星期×時段」上個月過半數有選，就帶入新月份（個別例外、休假不會帶入）
+function carry(P,fromYm,toYm){var fd=monthDates(fromYm),td=monthDates(toYm);
+  ORD.forEach(w=>starts.forEach(s=>{var f=fd.filter(d=>wd(d)===w&&!blocked(d,s)),n=f.filter(d=>P.sel.has(d+'|'+s)).length,yes=f.length&&n*2>f.length;
+    td.forEach(d=>{if(wd(d)!==w)return;var k=d+'|'+s;if(yes&&okS(d,s))P.sel.add(k);else P.sel.delete(k)})}))}
+// ---- 工具 ----
+function ranges(ss){var r=[],a=ss[0],b=a+L;for(var i=1;i<ss.length;i++){if(ss[i]===b)b+=L;else{r.push([a,b]);a=ss[i];b=a+L}}r.push([a,b]);return r}
+function dayWin(sel,d){var ss=starts.filter(s=>sel.has(d+'|'+s));return ss.length?ranges(ss).map(x=>hm(x[0])+'–'+hm(x[1])).join('、'):''}
+function winList(sel,ds){return ds.map(d=>dayWin(sel,d)?md(d)+'（'+WD[wd(d)]+'）'+dayWin(sel,d):'').filter(Boolean)}
+// ---- 共用選時段元件 ----
+function keysFor(P,d,s){var ds=P.scope==='week'?[0,1,2,3,4,5,6].map(i=>add(wks[P.wi],i)):dates,out=[];
+  ds.filter(x=>x>=FROM&&x<=TO&&x>=today&&(d===null||(P.scope==='week'?x===d:wd(x)===wd(d)))).forEach(x=>(s===null?starts:[s]).forEach(y=>{if(okS(x,y))out.push(x+'|'+y)}));return out}
+function pick(p){var P=P_(p),w0=wks[P.wi],ds=[0,1,2,3,4,5,6].map(i=>add(w0,i)),live=d=>d>=FROM&&d<=TO&&d>=today,m=P.scope==='month';
+  var h='<div class="sec">選擇可以的時間</div>'+
+   `<div class="scope" role="group" aria-label="套用範圍"><button data-p="${p}" data-a="scope" data-v="month" aria-pressed="${m}">整個月<small>每週相同</small></button><button data-p="${p}" data-a="scope" data-v="week" aria-pressed="${!m}">只這一週<small>處理例外</small></button></div>`+
+   `<p class="m${m?'':' warn'}">${m?'點到的格子會套用到整個月相同的星期和時間，例如點週五 19:00，就是每週五 19:00。再點一次取消。':'只會修改下方這一週，不影響其他週。'}</p>`+(toast?`<p class="toast" role="status">${toast}</p>`:'')+
+   `<div class="wnav"><button data-p="${p}" data-a="prev" aria-label="上一週"${P.wi===0?' disabled':''}>‹</button><b>${md(ds[0])} – ${md(ds[6])}</b><button data-p="${p}" data-a="next" aria-label="下一週"${P.wi===wks.length-1?' disabled':''}>›</button></div><div class="grid ${m?'gm':'gw'}"><span></span>`+
+   ds.map(d=>`<button class="gh" data-p="${p}" data-a="colT" data-d="${d}"${(m?dates.some(x=>wd(x)===wd(d)&&x>=today):live(d))?'':' disabled'}>${WD[wd(d)]}<small>${m?'每週':md(d)}</small></button>`).join('')+
+   starts.map(s=>`<button class="gh" data-p="${p}" data-a="rowT" data-s="${s}">${hm(s)}</button>`+ds.map(d=>{var k=d+'|'+s;return `<button class="gc${P.sel.has(k)?' on':''}${p!=='t'&&!TP.sel.has(k)?' out':''}" data-p="${p}" data-a="cell" data-k="${k}" aria-label="${md(d)} ${hm(s)}"${live(d)&&okS(d,s)?'':' disabled'}></button>`}).join('')).join('')+'</div>'+
+   (p!=='t'?'<p class="m">虛線格子是 Joanna 不上班的時段，可能會安排其他老師授課。</p>':'')+'<p class="m">上方切換「整個月」或「只這一週」；左右箭頭可以翻到其他週檢查例外。</p>';
+  if(p!=='t'){var a=analyze(P.sel);h+='<div class="card"><b>你目前的選擇</b><div class="m" style="margin:4px 0 0;white-space:pre-wrap">'+(a.runs.length?a.runs.map(r=>r.lab+' '+r.t).join('\n')+(a.off.length?'\n不行：'+a.off.map(md).join('、'):'')+(a.chg.length?'\n調整：'+a.chg.join('、'):''):'還沒有選任何時段')+'</div></div>'}
+  return h}
+function opt(a,b,c){var h='';for(var m=a;m<=b;m+=L)h+=`<option value="${m}"${m===c?' selected':''}>${hm(m)}</option>`;return h}
+function sheet(p){var P=P_(p),d=P.day;if(!d)return '';
+  var out=p==='s'&&starts.some(s=>P.sel.has(d+'|'+s)&&!TP.sel.has(d+'|'+s));
+  return `<div class="ov" data-a="close" data-p="${p}"></div><div class="sheet" role="dialog" aria-label="${md(d)} 時段"><b>${md(d)}（${WD[wd(d)]}）</b>
+  <div class="chips">${starts.map(s=>{var k=d+'|'+s;return `<button class="chip${p==='s'&&!TP.sel.has(k)?' out':''}" data-p="${p}" data-a="chip" data-k="${k}" aria-pressed="${P.sel.has(k)}"${okS(d,s)?'':' disabled'}>${hm(s)}</button>`}).join('')}</div>
+  ${p==='s'?`<p class="m${out?' warn':''}">虛線時段 Joanna 不上班，若選這些時段，可能會安排其他老師授課。</p>`:''}
+  <div class="row"><button class="btn" data-p="${p}" data-a="allday">整天皆可</button><button class="btn" data-p="${p}" data-a="clearday">清除</button><button class="btn pri" data-p="${p}" data-a="close">完成</button></div></div>`}
+// ---- 排課（單一老師；排不進去的列為「待補其他老師」）----
+function runSched(){lessons=[];unas=[];
+  for(var w=wk(START);w<=TO;w=add(w,7)){var wds=dates.filter(d=>wk(d)===w&&d>=START),seats=[];
+    var oth=[];Object.keys(PER).forEach(y=>{if(y!==curYm)PER[y].lessons.forEach(l=>oth.push(l))});
+    STU.forEach(st=>{if(st.hidden||lessons.some(l=>l.sid===st.id&&wk(l.d)===w)||oth.some(l=>l.sid===st.id&&wk(l.d)===w)||outs.some(o=>o.sid===st.id&&o.w===w))return;var c=[];
+      wds.forEach(d=>starts.forEach(s=>{if(st.sel.has(d+'|'+s)&&TP.sel.has(d+'|'+s)&&!lessons.some(l=>l.d===d&&l.s===s))c.push({k:d+'|'+s,d:d,s:s})}));
+      seats.push({st:st,c:c,w:wds})});
+    seats.sort((a,b)=>a.c.length-b.c.length);var own={},m={};
+    var tryA=(i,v)=>{var c=seats[i].c;for(var j=0;j<c.length;j++){var k=c[j].k;if(v[k])continue;v[k]=1;var o=own[k];if(o===undefined||tryA(o,v)){own[k]=i;return true}}return false};
+    seats.forEach((x,i)=>{if(tryA(i,{}))m[i]=1});
+    Object.keys(own).forEach(k=>{var q=k.split('|');lessons.push({id:++uid,sid:seats[own[k]].st.id,d:q[0],s:+q[1],locked:false})});
+    seats.forEach((x,i)=>{if(!m[i]){var all=winList(x.st.sel,x.w);unas.push({sid:x.st.id,w:w,why:x.c.length?'Joanna 的時段被其他學生佔滿':all.length?'學生選的時段 Joanna 不上班':'這週沒有選時段',wins:all})}})}
+  unas=unas.concat(outs);lessons.sort((a,b)=>a.d.localeCompare(b.d)||a.s-b.s)}
+var sn=id=>STU.filter(s=>s.id===id)[0].name;
+var SH=null,log=[],names=[];try{names=JSON.parse(localStorage.getItem('pl_names')||'[]')}catch(e){}
+var esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+var lab=(d,s)=>md(d)+'（'+WD[wd(d)]+'）'+hm(s);
+function remember(n){if(!n||n==='Joanna')return;names=[n].concat(names.filter(x=>x!==n)).slice(0,8);try{localStorage.setItem('pl_names',JSON.stringify(names))}catch(e){}}
+function notify(sid,text){if(status==='notified'){log.unshift({k:'adj',t:nowStr(),sid:sid,text:text});return '已自動發送 LINE 訊息給 '+sn(sid)+'。'}return '目前尚未推播課表，這次調整會包含在正式通知中。'}
+function conflict(nm,d,s,sid,ign){var t=nm||'Joanna';
+  if(lessons.some(x=>x.id!==ign&&(x.by||'Joanna')===t&&x.d===d&&x.s===s))return t+' 在這個時段已經有課';
+  if(lessons.some(x=>x.id!==ign&&x.sid===sid&&x.d===d&&x.s===s))return sn(sid)+' 在這個時段已經有課';return ''}
+function applySheet(){var m=SH.mode,l=m==='fill'?null:lessons.filter(x=>x.id===SH.id)[0],u=m==='fill'?unas[SH.i]:null,nm=(SH.name||'').trim(),q=(SH.key||'').split('|'),err='',msg='',sid=l?l.sid:u.sid,done='';
+  if(m!=='time'&&!nm)err='請輸入或選擇老師名稱';
+  if(!err&&m!=='sub'&&!SH.key)err='請選擇一個上課時間';
+  if(!err&&m==='sub'){err=conflict(nm==='Joanna'?'':nm,l.d,l.s,sid,l.id);if(!err){l.by=nm==='Joanna'?undefined:nm;remember(nm);
+    msg=sn(sid)+' 你好 🌸 '+lab(l.d,l.s)+' 的課，'+(nm==='Joanna'?'改回由 Joanna 老師授課':'Joanna 老師臨時無法授課，將由 '+nm+' 老師代課，時間不變')+'。如有問題請直接回覆我，謝謝！🫶🏻';done=sn(sid)+' '+lab(l.d,l.s)+' 的授課老師已改為 '+(l.by||'Joanna')+'。'}}
+  if(!err&&m==='time'){if(!l.by&&!TP.sel.has(SH.key))err='Joanna 在這個時段不上班，可以先用「請人代」換老師。';else err=conflict(l.by||'',q[0],+q[1],sid,l.id);
+    if(!err){var o=lab(l.d,l.s);l.d=q[0];l.s=+q[1];msg=sn(sid)+' 你好 🌸 你的課已調整：'+o+' → '+lab(l.d,l.s)+'，授課老師：'+(l.by||'Joanna')+' 老師。如有問題請直接回覆我，謝謝！🫶🏻';done=sn(sid)+' 的課已從 '+o+' 改到 '+lab(l.d,l.s)+'。'}}
+  if(!err&&m==='fill'){err=conflict(nm==='Joanna'?'':nm,q[0],+q[1],sid,-1);if(!err){lessons.push({id:++uid,sid:sid,d:q[0],s:+q[1],by:nm==='Joanna'?undefined:nm});unas.splice(SH.i,1);remember(nm);
+    msg=sn(sid)+' 你好 🌸 你的課已安排好：'+lab(q[0],+q[1])+'，授課老師：'+nm+' 老師。如有問題請直接回覆我，謝謝！🫶🏻';done=sn(sid)+' 的課已安排：'+lab(q[0],+q[1])+'，'+nm+' 老師。'}}
+  if(err){SH.err=err;return}
+  lessons.sort((a,b)=>a.d.localeCompare(b.d)||a.s-b.s);notice=done+' '+notify(sid,msg);SH=null}
+function adjSheet(){var m=SH.mode,l=m==='fill'?null:lessons.filter(x=>x.id===SH.id)[0],u=m==='fill'?unas[SH.i]:null,sid=l?l.sid:u.sid,st=STU.filter(x=>x.id===sid)[0];
+  var title=m==='time'?sn(sid)+' 改時間（目前 '+lab(l.d,l.s)+'）':m==='sub'?sn(sid)+' '+lab(l.d,l.s)+' 請人代':sn(sid)+' 安排老師與時間';
+  var h='<div class="ov" data-a="sx"></div><div class="sheet" role="dialog" aria-label="'+title+'"><b>'+title+'</b>';
+  if(m!=='time'){h+='<p class="m" style="margin:10px 0 4px">代課老師</p><input id="tn" class="tin" list="tnl" value="'+esc(SH.name||'')+'" placeholder="輸入老師名稱" autocomplete="off"><datalist id="tnl">'+names.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+
+    '<div class="tags">'+(m==='sub'&&l.by?'<button class="tag" data-a="nm" data-n="Joanna" aria-pressed="'+(SH.name==='Joanna')+'">改回 Joanna</button>':'')+names.map(n=>'<span class="tagp"><button class="tag" data-a="nm" data-n="'+esc(n)+'" aria-pressed="'+(SH.name===n)+'">'+esc(n)+'</button><button class="tagx" data-a="nmdel" data-n="'+esc(n)+'" aria-label="刪除 '+esc(n)+'">✕</button></span>').join('')+'</div>'+(names.length?'<p class="m">按 ✕ 可以刪除記住的名稱，不影響已排好的課。</p>':'<p class="m">輸入過的老師名稱會記住，下次直接點選。</p>')}
+  if(m!=='sub'){var wk0=l?wk(l.d):u.w,c=[];dates.forEach(d=>{if(d<START||wk(d)!==wk0)return;starts.forEach(s=>{var k=d+'|'+s;if(!st.sel.has(k)||(l&&d===l.d&&s===l.s)||lessons.some(x=>x.sid===sid&&x.d===d&&x.s===s))return;
+      if(m==='time'&&!l.by&&(!TP.sel.has(k)||lessons.some(x=>!x.by&&x.d===d&&x.s===s)))return;c.push(k)})});
+    h+='<p class="m" style="margin:10px 0 4px">'+(m==='time'?'學生選過、Joanna 也有空的時段（同一週）':'學生這週選過的時段')+'</p>'+(c.length?'<div class="slots">'+c.slice(0,12).map(k=>{var q=k.split('|');return '<button data-a="pk" data-k="'+k+'" aria-pressed="'+(SH.key===k)+'">'+lab(q[0],+q[1])+'</button>'}).join('')+'</div>':'<p class="m">這週沒有符合的時段，可以用下面的「其他時間」。</p>')+
+      '<p class="m" style="margin:10px 0 4px">其他時間</p><div class="rng"><select data-a="cd" aria-label="日期"><option value="">日期</option>'+dates.filter(d=>d>=START).map(d=>'<option value="'+d+'"'+(SH.cd===d?' selected':'')+'>'+lab(d,0).replace('00:00','').trim()+'</option>').join('')+'</select><select data-a="ct" aria-label="時間"><option value="">時間</option>'+starts.map(s=>'<option value="'+s+'"'+(String(SH.ct)===String(s)?' selected':'')+'>'+hm(s)+'</option>').join('')+'</select></div>'+(SH.key?'<p class="m">已選：'+lab(SH.cd,+SH.ct)+'</p>':'')}
+  return h+(SH.err?'<p class="warn" role="alert">'+SH.err+'</p>':'')+'<div class="row" style="margin-top:12px"><button class="btn" data-a="sx">取消</button><button class="btn pri" data-a="sok">'+(m==='time'?'改成這個時間':m==='sub'?'確認代課':'確認安排')+'</button></div></div>'}
+// ---- 發給學生的上班時間 ----
+function analyze(sel){var typ={},off=[],chg=[];
+  ORD.forEach(w=>{var a=dates.filter(d=>d>=today&&wd(d)===w).map(d=>[d,dayWin(sel,d)]),c={};a.forEach(x=>{if(x[1])c[x[1]]=(c[x[1]]||0)+1});
+    var best=Object.keys(c).sort((x,y)=>c[y]-c[x])[0];typ[w]=best;a.forEach(x=>{if(!x[1]){if(best)off.push(x[0])}else if(x[1]!==best)chg.push(md(x[0])+' 改為 '+x[1])})});
+  var runs=[];ORD.forEach((w,i)=>{if(!typ[w])return;var l=runs[runs.length-1];if(l&&l.t===typ[w]&&l.ws[l.ws.length-1]===ORD[i-1])l.ws.push(w);else runs.push({t:typ[w],ws:[w]})});
+  return{runs:runs.map(r=>{var n=r.ws.length,a=r.ws;return{t:r.t,lab:n===1?'週'+WD[a[0]]:n===2?'週'+WD[a[0]]+'、週'+WD[a[1]]:'週'+WD[a[0]]+'至週'+WD[a[n-1]]}}),off:off.sort(),chg:chg}}
+function hoursMsg(){var a=analyze(TP.sel);
+  var lines=a.runs.map(r=>{var e=r.t.split('、').pop().split('–')[1],em=+e.slice(0,2)*60+(+e.slice(3));return r.lab+' '+r.t+'（最後一堂 '+hm(em-L)+' 開始）'});
+  return '👩🏻 Joanna '+mon(curYm)+' 月可預約時段\n'+(lines.join('\n')||'本月無上班')+(a.off.length?'\n🚫 休假（無法預約）：'+a.off.map(md).join('、'):'')+(a.chg.length?'\n⏰ 時段調整：'+a.chg.join('、'):'')+'\n\n🚫 固定無法預約：每週三 16:00–17:00（公司開會）\n💡 Joanna 不上班的時段若有需要，會安排其他老師授課。'}
+// ---- 畫面 ----
+function vStudent(){var oy=openYm();
+  if(!oy){savePer();var ls=[],pend=[];Object.keys(PER).sort().forEach(y=>{var p=PER[y];if(p.status==='notified')p.lessons.filter(l=>l.sid==='s1').forEach(l=>ls.push(l));else if(p.status!=='collecting')pend.push(mon(y)+' 月')});
+    return `<h1>目前沒有開放選課</h1><p class="sub">下個月開放選課時，會用 LINE 通知你。</p>${pend.length?`<p class="m">${pend.join('、')}的課表還在安排中，確定後會通知你。</p>`:''}<div class="card"><b>我的課表</b>${ls.length?ls.map(l=>`<div class="li"><span>${lab(l.d,l.s)}</span><span>${esc(l.by||'Joanna')} 老師</span></div>`).join(''):'<p class="m">還沒有已公布的課表。</p>'}</div>`}
+  var pv=Object.keys(PER).sort().filter(y=>y<curYm).pop();
+  return `<h1>🌸 ${mon(curYm)} 月皮拉提斯選課開始囉！</h1><p class="sub">請勾選這個月所有可以上課的日期與時間，並於 ${md(PER[curYm].deadline)} 前完成。我們會在 27 日前安排完成，並用 LINE 個別通知你上課日期、時間及授課老師。</p>
+  <details class="card" open><summary>選課規則與時間說明</summary><ul><li>營業時間 10:00–22:00，最後一堂 21:00 開始；每週三 16:00–17:00 公司開會</li><li>Joanna 可預約 13:00–22:00（虛線時段 Joanna 不上班，可能由其他老師授課）</li><li>每堂 60 分鐘，原則上每週一堂</li><li>平日晚上是熱門時段，選得越多越容易安排，但不保證排到第一志願</li><li>送出不代表預約完成，請以正式課表為準</li><li>時間都無法安排時，我們會另外與你聯絡</li></ul></details>`+
+  (pv?`<button class="btn" style="width:100%;margin-top:6px" data-a="carry">沿用 ${mon(pv)} 月的選擇</button><p class="m">一鍵帶入上個月的每週規律，再微調這個月的例外。</p>`:'')+pick('s')}
+function leaveCard(){var fd=dates.filter(d=>d>=today);if(!fd.length)return '';LV.a=LV.a||fd[0];LV.b=LV.b||fd[0];var o=v=>fd.map(d=>`<option value="${d}"${d===v?' selected':''}>${md(d)}（${WD[wd(d)]}）</option>`).join('');
+  return `<div class="card"><b>連續休假</b><p class="hint">一次把一段日期設為不上班</p><div class="rng"><select data-a="la" aria-label="開始日">${o(LV.a)}</select>到<select data-a="lb" aria-label="結束日">${o(LV.b)}</select></div><button class="btn" style="width:100%;margin-top:8px" data-a="leave">設為休假</button></div>`}
+function monthBar(){var ys=Object.keys(PER).sort(),i=ys.indexOf(curYm),last=ys[ys.length-1],nx=nextYm(last);
+  return `<div class="wnav"><button data-a="mprev" aria-label="上個月"${i===0?' disabled':''}>‹</button><b>${ymLabel(curYm)} <span class="pillt">${STN[status]}</span></b><button data-a="mnext" aria-label="下個月"${i===ys.length-1?' disabled':''}>›</button></div>`+
+   (status==='collecting'?`<div class="card"><label class="m" for="dl">學生選課截止日</label><br><input type="date" id="dl" class="tin" style="width:auto" data-a="dl" value="${PER[curYm].deadline}" min="${today}"></div>`:'')+
+   (curYm===last?`<button class="btn pri" style="width:100%;margin-bottom:6px" data-a="openNext"${statusOf(last)==='collecting'?' disabled':''}>開始 ${mon(nx)} 月選課</button>${statusOf(last)==='collecting'?'<p class="m">先完成這個月的自動排課，才能開放下個月選課。</p>':'<p class="m">開放後，會自動帶入這個月的上班時段，你只要補上休假。</p>'}`:'')}
+function addStCard(){return `<div class="card"><b>新增學生</b><p class="hint">學生第一次從 LINE 進來填寫時，會自動出現在名單。不用 LINE 的學生，可以在這裡手動新增。</p><div class="rng"><input id="ns" class="tin" placeholder="學生名稱" value="${esc(NS)}" autocomplete="off"><button class="btn" data-a="addst" style="flex:0 0 auto;padding:0 18px">新增</button></div></div>`}
+function hidCard(h){return h.length?`<details class="card"><summary>已隱藏的學生（${h.length}）</summary><p class="hint">不會再被排課或提醒，過去的課表紀錄會保留。</p>${h.map(x=>`<div class="li"><span>${x.name}</span><button data-a="unhide" data-id="${x.id}">恢復</button></div>`).join('')}</details>`:''}
+function studentsTab(){
+  if(AS){var st=STU.filter(x=>x.id===AS)[0],pv=Object.keys(PER).sort().filter(y=>y<curYm).pop();
+    return `<button class="btn" data-a="actback">‹ 返回學生列表</button><h1>幫 ${st.name} 填寫</h1><p class="hint">你正在代替 ${st.name} 填寫 ${mon(curYm)} 月可上課的時間，點格子的方式和學生端一樣。</p>`+
+     (status!=='collecting'?'<p class="warn">這個月已截止收集。修改不會自動重排，如要調整課表，請到「排課」用「改時間」。</p>':'')+
+     (pv?`<button class="btn" style="width:100%;margin-top:6px" data-p="a" data-a="carry">沿用 ${mon(pv)} 月的選擇</button>`:'')+pick('a')+
+     `<button class="btn pri" style="width:100%;margin-top:10px" data-a="actdone">完成（已選 ${monthCount(ACTP)} 個時段）</button>`}
+  var act=STU.filter(x=>!x.hidden),hid=STU.filter(x=>x.hidden),nf=act.filter(x=>!filled(x)),dl=PER[curYm].deadline,rem=log.filter(x=>x.k==='rem');
+  return `<h1>學生</h1>${notice?'<p class="toast" role="status">'+notice+'</p>':''}<p class="hint">學生不會操作時，可以照他傳給你的時間，幫他填寫或修改。</p><div class="card"><b>${mon(curYm)} 月填寫狀況</b>`+
+   act.map(x=>`<div class="li"><span>${x.name}${PROXY[x.id+'|'+curYm]?' <span class="pillt">老師代填</span>':''}</span><span><span class="${filled(x)?'':'warn'}">${filled(x)?'已填寫':'尚未填寫'}</span> <button data-a="actfor" data-id="${x.id}">${filled(x)?'修改':'幫他填'}</button> <button data-a="hide" data-id="${x.id}">${pendHide===x.id?'確認隱藏':'隱藏'}</button></span></div>`).join('')+'</div>'+addStCard()+hidCard(hid)+
+   (status==='collecting'?`<div class="card"><p class="m" style="margin-top:0">系統會在截止前 2 天（${md(add(dl,-2))}）自動提醒尚未填寫的學生。</p><button class="btn" style="width:100%" data-a="remind"${nf.length?'':' disabled'}>現在就提醒 ${nf.length} 位未填的學生</button>${rem.length?'<p class="m" style="margin-top:8px">已發出的提醒：</p>'+rem.slice(0,4).map(x=>`<div class="msg">${x.t} → ${sn(x.sid)}<br>${x.text}</div>`).join(''):''}</div>`:'')}
+function vTeacher(){return monthBar()+vTeacher0()}
+function vTeacher0(){
+  if(tab==='students')return studentsTab();
+  if(tab==='hours'){var m=hoursMsg();return `<h1>上班時間</h1><p class="hint">先設定休假日，再細調每週固定的上班時段。預設整個月都上班。</p>`+leaveCard()+pick('t')+
+    `<div class="sec">發給學生的上班時間</div><p class="hint">會隨上方設定自動更新</p><textarea id="hm" readonly rows="${m.split('\n').length+1}">${m}</textarea><div class="row" style="margin-top:8px"><button class="btn" data-a="copy">複製訊息</button></div>`}
+  if(tab==='plan'){var ran=lessons.length>0||unas.length>0,done=status==='approved'||status==='notified',h=`<h1>排課</h1><div class="row"><button class="btn pri" data-a="run"${ran?' disabled':''}>自動排課</button><button class="btn" data-a="approve"${!lessons.length||done?' disabled':''}>${pendAppr?'確認核准（仍有 '+unas.length+' 位次待補）':'核准課表'}</button></div>`;
+    if(notice)h+='<p class="toast" role="status">'+notice+'</p>';
+    if(!ran)return h+'<p class="hint">按「自動排課」依學生選的時段先排一次。之後的調整，都用每堂課旁的「改時間」和「請人代」手動處理。只排 Joanna，排不進去的會列在「待補其他老師」。</p>';
+    h+=`<p>已排入 <b>${lessons.length}</b> 堂，待補其他老師 <b class="${unas.length?'warn':''}">${unas.length}</b> 位次</p>`+(status==='notified'?'<p class="m">已推播課表。之後的調整會自動發訊息通知學生。</p>':'<p class="m">推播前的調整不會發訊息，會直接包含在正式通知裡。</p>');var cur='';
+    lessons.forEach(l=>{var w=wk(l.d);if(w!==cur){cur=w;h+=`<div class="wh">${md(w)} 起這週</div>`}
+      h+=`<div class="li"><span>${md(l.d)}（${WD[wd(l.d)]}）${hm(l.s)} ${sn(l.sid)}${l.by?`<br><span class="m">代課：${esc(l.by)}</span>`:''}</span><span><button data-a="chg" data-id="${l.id}">改時間</button> <button data-a="sub" data-id="${l.id}">請人代</button></span></div>`});
+    if(unas.length){h+='<div class="card"><b class="warn">待補其他老師</b>';unas.forEach((u,i)=>{h+=`<div class="li" style="display:block"><b>${sn(u.sid)}</b>　${md(u.w)} 起這週<br><span class="m">${u.why}${u.wins.length?'<br>可上課：'+u.wins.join('；'):''}</span><br><button data-a="fill" data-i="${i}" style="margin-top:6px">安排老師與時間</button></div>`});h+='</div>'}
+    return h}
+  if(status!=='approved'&&status!=='notified')return '<h1>通知</h1><p class="hint">請先在「排課」核准課表，核准後才會產生學生通知。</p>';
+  return '<h1>通知</h1><p class="hint">每位學生會在 LINE 收到自己的課表，不會傳到群組。</p>'+STU.filter(s=>!s.hidden).map(s=>{var ls=lessons.filter(l=>l.sid===s.id),n=unas.filter(u=>u.sid===s.id).length;
+    return `<div class="card"><b>${s.name}</b> ${notified?'<span class="pillt">已通知</span>':''}<div class="msg">${s.name} 你好 🌸\n這是你 ${mon(curYm)} 月的上課時間：\n${ls.map(l=>md(l.d)+'（'+WD[wd(l.d)]+'）'+hm(l.s)+'–'+hm(l.s+L)+'　'+esc(l.by||'Joanna')+' 老師').join('\n')}${n?'\n另有 '+n+' 週的課還在安排授課老師，確定後會再通知你。':''}</div></div>`}).join('')+`<button class="btn pri" style="width:100%" data-a="send"${notified?' disabled':''}>模擬推播給全部學生</button>`+
+    (log.filter(x=>x.k!=='rem').length?'<div class="sec">之後自動發送的訊息</div>'+log.filter(x=>x.k!=='rem').map(x=>`<div class="card"><span class="m">${x.t} → ${sn(x.sid)}</span><div class="msg">${x.text}</div></div>`).join(''):'')}
+
+function render(){var y=scrollY;
+  document.getElementById('role').innerHTML=[['student','學生畫面'],['teacher','老師管理']].map(r=>`<button data-a="role" data-r="${r[0]}" aria-pressed="${role===r[0]}">${r[1]}</button>`).join('');
+  document.getElementById('view').innerHTML=role==='student'?vStudent():vTeacher();
+  var n=monthCount(SP);
+  document.getElementById('foot').innerHTML=role==='student'?(!openYm()?'':`<div class="bar"><div><label><input type="checkbox" data-a="consent"${consent?' checked':''}>我同意工作室使用我的 LINE 名稱與所選時段來安排課程</label><button class="btn pri" style="width:100%" data-a="submit"${!n||!consent?' disabled':''}>送出 ${n} 個可上課時段</button>${sent?`<p class="m" role="status">${sent}</p>`:''}</div></div>`):
+    `<div class="bar" style="padding:0 0 env(safe-area-inset-bottom,0px)"><div class="tabs" role="tablist">${[['hours','上班時間'],['students','學生'],['plan','排課'],['notify','通知']].map(t=>`<button role="tab" data-a="tab" data-t="${t[0]}" aria-selected="${tab===t[0]}">${t[1]}</button>`).join('')}</div></div>`;
+  var sp=role==='student'?'s':'t';document.getElementById('sheet').innerHTML=role==='teacher'&&SH?adjSheet():sheet(sp);scrollTo(0,y)}
+document.addEventListener('click',e=>{var b=e.target.closest('[data-a]');if(!b||b.tagName==='SELECT'||b.type==='checkbox')return;var a=b.dataset.a,P=b.dataset.p&&P_(b.dataset.p),t=b.dataset.p==='t';if(a==='cell')return;sent='';toast='';notice='';if(a!=='approve')pendAppr=false;if(a!=='hide')pendHide=null;
+  if(a==='role'){SH=null;AS=null;role=b.dataset.r;TP.day=SP.day=null;if(role==='student'){var oy=openYm();if(oy)useMonth(oy)}else useMonth(tYm)}
+  else if(a==='mprev'||a==='mnext'){var ys=Object.keys(PER).sort();useMonth(ys[ys.indexOf(curYm)+(a==='mnext'?1:-1)]);tYm=curYm}
+  else if(a==='openNext'){var ys2=Object.keys(PER).sort(),pv0=ys2[ys2.length-1],nx=nextYm(pv0);PER[nx]={status:'collecting',lessons:[],unas:[],notified:0,log:[],deadline:add(today,7)};useMonth(nx);tYm=nx;seedOthers();carry(TP,pv0,nx);tab='hours';toast='已開放 '+mon(nx)+' 月選課，並帶入上個月的上班時段。請先設定這個月的休假。'}
+  else if(a==='addst'){var nn=(NS||'').trim(),ex=STU.filter(x=>x.name===nn)[0];
+    if(!nn)notice='請輸入學生名稱。';else if(ex)notice=nn+' 已經在名單裡'+(ex.hidden?'（已隱藏，可以在下方恢復）':'')+'。';
+    else{STU.push({id:'s'+(STU.length+1),name:nn,sel:new Set()});NS='';notice='已新增 '+nn+'。可以按「幫他填」先填寫上課時間。'}}
+  else if(a==='unhide'){var uh=STU.filter(x=>x.id===b.dataset.id)[0];uh.hidden=false;notice='已恢復 '+uh.name+'。'}
+  else if(a==='hide'){var hid0=b.dataset.id,hs=STU.filter(x=>x.id===hid0)[0];savePer();
+    var fut=0;Object.keys(PER).forEach(y=>PER[y].lessons.forEach(l=>{if(l.sid===hid0&&l.d>=today)fut++}));
+    if(fut&&pendHide!==hid0){pendHide=hid0;notice=hs.name+' 還有 '+fut+' 堂尚未上的課，隱藏後會一併移除。如果確定，請再按一次「確認隱藏」。'}
+    else{Object.keys(PER).forEach(y=>{PER[y].lessons=PER[y].lessons.filter(l=>!(l.sid===hid0&&l.d>=today));PER[y].unas=PER[y].unas.filter(u=>u.sid!==hid0)});
+      lessons=PER[curYm].lessons;unas=PER[curYm].unas;outs=outs.filter(o=>o.sid!==hid0);hs.hidden=true;pendHide=null;notice='已隱藏 '+hs.name+(fut?'，並移除 '+fut+' 堂尚未上的課':'')+'。'}}
+  else if(a==='nmdel'){names=names.filter(x=>x!==b.dataset.n);try{localStorage.setItem('pl_names',JSON.stringify(names))}catch(e){}if(SH&&SH.name===b.dataset.n)SH.name=''}
+  else if(a==='actfor'){AS=b.dataset.id;ACTP={sel:STU.filter(x=>x.id===AS)[0].sel,day:null,wi:firstWeek(),scope:'month'}}
+  else if(a==='actback')AS=null;
+  else if(a==='actdone'){var an=STU.filter(x=>x.id===AS)[0],c0=monthCount(ACTP);if(c0){PROXY[AS+'|'+curYm]=1;notice='已幫 '+an.name+' 儲存 '+c0+' 個時段。'}AS=null}
+  else if(a==='carry'){var pv1=Object.keys(PER).sort().filter(y=>y<curYm).pop();carry(P||SP,pv1,curYm);toast='已帶入 '+mon(pv1)+' 月的每週規律，可以再微調個別日期。'}
+  else if(a==='remind'){var nf=STU.filter(st=>!st.hidden&&!filled(st));nf.forEach(st=>log.unshift({k:'rem',t:nowStr(),sid:st.id,text:st.name+' 你好 🌸 '+mon(curYm)+' 月的選課還沒收到你的時段喔，請在 '+md(PER[curYm].deadline)+' 前點選下方按鈕填寫，謝謝！🫶🏻'}));notice='已提醒 '+nf.length+' 位尚未填寫的學生。'}
+  else if(a==='tab'){tab=b.dataset.t;AS=null}
+  else if(a==='cw'){var w=+b.dataset.w;P.cw=P.cw===w?null:w}
+  else if(a==='wall'){P.act[P.cw]='on';dates.filter(d=>wd(d)===P.cw).forEach(d=>starts.forEach(s=>okS(d,s)&&P.sel.add(d+'|'+s)));if(t)stale=true}
+  else if(a==='wnone'){P.act[P.cw]='off';dates.filter(d=>wd(d)===P.cw).forEach(d=>starts.forEach(s=>P.sel.delete(d+'|'+s)));if(t)stale=true}
+  else if(a==='prev')P.wi--;else if(a==='next')P.wi++;
+  else if(a==='scope')P.scope=b.dataset.v;
+  else if(a==='colT'||a==='rowT'){var col=a==='colT',d0=col?b.dataset.d:null,s0=col?null:+b.dataset.s,ks=keysFor(P,d0,s0),all=ks.length>0&&ks.every(k=>P.sel.has(k));
+    ks.forEach(k=>all?P.sel.delete(k):P.sel.add(k));if(P.scope==='month')toast='已'+(all?'取消':'選取')+(col?'整個月每週'+WD[wd(d0)]+'的所有時段':'整個月每天 '+hm(s0));if(t)stale=true}
+  else if(a==='leave'){dates.filter(d=>d>=LV.a&&d<=LV.b).forEach(d=>starts.forEach(s=>TP.sel.delete(d+'|'+s)));stale=true;toast='已把 '+md(LV.a)+(LV.a!==LV.b?' – '+md(LV.b):'')+' 設為休假，可以在下方格子細調。'}
+  else if(a==='day')P.day=b.dataset.d;
+  else if(a==='close')P.day=null;
+  else if(a==='chip'){P.sel.has(b.dataset.k)?P.sel.delete(b.dataset.k):P.sel.add(b.dataset.k);if(t)stale=true}
+  else if(a==='allday'){starts.forEach(s=>okS(P.day,s)&&P.sel.add(P.day+'|'+s));if(t)stale=true}
+  else if(a==='clearday'){starts.forEach(s=>P.sel.delete(P.day+'|'+s));if(t)stale=true}
+  else if(a==='copy'){var x=document.getElementById('hm');try{navigator.clipboard.writeText(x.value);b.textContent='已複製'}catch(_){x.select();b.textContent='請長按複製'}return}
+  else if(a==='run'){runSched();status='draft';stale=false}
+  else if(a==='approve'){if(unas.length&&!pendAppr){pendAppr=true;notice='還有 '+unas.length+' 位次待補其他老師。如果仍要核准，請再按一次「確認核准」。';render();return}pendAppr=false;status='approved'}
+  else if(a==='chg')SH={mode:'time',id:+b.dataset.id,key:'',cd:'',ct:'',err:''};
+  else if(a==='sub'){var l0=lessons.filter(x=>x.id==+b.dataset.id)[0];SH={mode:'sub',id:l0.id,name:l0.by||'',err:''}}
+  else if(a==='fill')SH={mode:'fill',i:+b.dataset.i,name:'',key:'',cd:'',ct:'',err:''};
+  else if(a==='nm')SH.name=b.dataset.n;
+  else if(a==='pk'){SH.key=b.dataset.k;var q0=SH.key.split('|');SH.cd=q0[0];SH.ct=q0[1];SH.err=''}
+  else if(a==='sx')SH=null;
+  else if(a==='sok')applySheet();
+  else if(a==='send'){notified=1;status='notified'}
+  else if(a==='submit')delete PROXY['s1|'+curYm],sent='預覽模式：已模擬送出 '+monthCount(SP)+' 個時段。排好後會在 LINE 個別通知你上課日期、時間及授課老師。';
+  else return;render()});
+document.addEventListener('change',e=>{var el=e.target,a=el.dataset.a;if(!a)return;
+  if(a==='consent'){consent=el.checked;return render()}
+  if(a==='lock'){lessons.filter(x=>x.id==+el.dataset.id)[0].locked=el.checked;return render()}
+  if(a==='cd'||a==='ct'){if(a==='cd')SH.cd=el.value;else SH.ct=el.value;if(SH.cd&&SH.ct)SH.key=SH.cd+'|'+SH.ct;SH.err='';return render()}
+  if(a==='dl'){PER[curYm].deadline=el.value||PER[curYm].deadline;return render()}
+  if(a==='la'){LV.a=el.value;if(LV.b<LV.a)LV.b=LV.a;return render()}
+  if(a==='lb'){LV.b=el.value;if(LV.b<LV.a)LV.a=LV.b;return render()}
+  return});
+document.addEventListener('input',e=>{if(e.target.id==='tn'&&SH)SH.name=e.target.value;if(e.target.id==='ns')NS=e.target.value});
+var paint=null,pend=null;
+function setCell(c){var q=c.dataset.k.split('|');keysFor(paint.P,q[0],+q[1]).forEach(k=>paint.val?paint.P.sel.add(k):paint.P.sel.delete(k));c.classList.toggle('on',paint.val);paint.n=(paint.n||0)+1;paint.q=q}
+var endPaint=()=>{if(pend){clearTimeout(pend.timer);pend=null}if(!paint)return;if(paint.p==='t')stale=true;if(paint.P.scope==='month')toast=paint.n===1?'已'+(paint.val?'選取':'取消')+'整個月每週'+WD[wd(paint.q[0])]+' '+hm(+paint.q[1]):'已套用到整個月相同的星期和時間';paint=null;sent='';render()};
+document.addEventListener('pointerdown',e=>{toast='';var c=e.target.closest&&e.target.closest('.gc');if(!c||c.disabled)return;var P=P_(c.dataset.p),st={P:P,p:c.dataset.p,val:!P.sel.has(c.dataset.k),last:c.dataset.k,c:c,x:e.clientX,y:e.clientY};
+  if(e.pointerType==='mouse'){paint=st;setCell(c);e.preventDefault()}
+  else{pend=st;st.timer=setTimeout(()=>{if(pend===st){paint=st;pend=null;setCell(c);if(navigator.vibrate)navigator.vibrate(12)}},300)}});
+document.addEventListener('pointermove',e=>{
+  if(pend&&(Math.abs(e.clientX-pend.x)>8||Math.abs(e.clientY-pend.y)>8)){clearTimeout(pend.timer);pend=null}
+  if(!paint)return;var el=document.elementFromPoint(e.clientX,e.clientY),c=el&&el.closest('.gc');
+  if(c&&!c.disabled&&c.dataset.p===paint.p&&c.dataset.k!==paint.last){paint.last=c.dataset.k;setCell(c)}});
+document.addEventListener('touchmove',e=>{if(paint)e.preventDefault()},{passive:false});
+document.addEventListener('pointerup',()=>{if(pend){paint=pend;clearTimeout(pend.timer);pend=null;setCell(paint.c)}endPaint()});
+document.addEventListener('pointercancel',()=>{if(pend){clearTimeout(pend.timer);pend=null}endPaint()});
+render();
+</script>
+</body>
+</html>

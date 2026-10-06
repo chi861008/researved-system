@@ -1,0 +1,17 @@
+const {JSDOM}=require('jsdom');const fs=require('fs');
+const dom=new JSDOM(fs.readFileSync(require('path').join(__dirname,'../../prototype/scheduler-grid-preview.html'),'utf8'),{url:'https://x.test/',runScripts:'dangerously',pretendToBeVisual:true,beforeParse(w){w.scrollTo=()=>{}}});
+const w=dom.window,d=w.document;
+const click=s=>{const e=d.querySelector(s);if(!e)throw new Error('missing '+s);e.click()};
+const ev=(t,e)=>e.dispatchEvent(new w.Event(t,{bubbles:true,cancelable:true}));
+const tap=s=>{const e=d.querySelector(s);if(!e)throw new Error('missing '+s);ev('pointerdown',e);ev('pointerup',e)};
+const txt=()=>d.getElementById('view').textContent;
+click('[data-a=role][data-r=teacher]');click('[data-a=tab][data-t=students]');
+console.log('分頁:',[...d.querySelectorAll('[role=tab]')].map(e=>e.textContent).join('/'));
+console.log('Amy 狀態:',txt().match(/Amy[^B]*?(尚未填寫|已填寫)/)[1],'| 提醒鈕:',d.querySelector('[data-a=remind]').textContent.trim());
+d.querySelector('[data-a=actfor][data-id=s1]').click();
+console.log('代填標題:',d.querySelector('h1').textContent,'| 有格子:',d.querySelectorAll('[data-p=a][data-a=cell]').length);
+tap('[data-p=a][data-k="2026-10-09|1140"]');tap('[data-p=a][data-k="2026-10-07|1200"]');
+console.log('完成鈕:',d.querySelector('[data-a=actdone]').textContent.trim());
+click('[data-a=actdone]');console.log(d.querySelector('.toast')&&d.querySelector('.toast').textContent);
+console.log('Amy 狀態:',txt().match(/Amy[^B]*?(尚未填寫|已填寫)/)[1],'| 老師代填標籤:',txt().includes('老師代填'),'| 提醒鈕:',d.querySelector('[data-a=remind]').textContent.trim());
+click('[data-a=role][data-r=student]');console.log('學生端 Amy 看到的選擇:',d.querySelector('[data-a=submit]').textContent.trim());

@@ -1,0 +1,1 @@
+{ "name":"preview-e2e","private":true,"scripts":{"test":"for f in e2e-*.js; do echo == $f; node $f || exit 1; done"},"devDependencies":{"jsdom":"^25.0.0"} }

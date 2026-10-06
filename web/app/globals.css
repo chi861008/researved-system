@@ -1,0 +1,141 @@
+/* 暖陶橘：米白底＋飽和陶土橘重點色 */
+:root { --bg:#efe8df; --ink:#2e2722; --muted:#9c8f7e; --line:#e3d8c9; --on:#d9622f; --on-ink:#fff; --warn:#b2501f; --card:#fbf7f1; --soft:#fbe3d4; }
+@media (prefers-color-scheme: dark) { :root { --bg:#241d16; --ink:#ede6db; --muted:#b7a890; --line:#473a2c; --on:#e8763f; --on-ink:#241206; --warn:#f0a36f; --card:#2d251c; --soft:#3d2a1c; } }
+* { box-sizing: border-box; }
+html, body { margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif; line-height:1.6; }
+/* 手機瀏覽器（尤其 LINE 內建瀏覽器）往下滑到底會有「彈一下」的橡皮筋效果，捲動時網址列收合/展開
+   也會讓可視高度跟著變動，連帶讓貼底的 .bar 看起來跳動、高度忽高忽低；關掉整頁的彈性捲動可以減少這種感覺。 */
+html { overscroll-behavior-y: none; }
+button, select, input, textarea { font:inherit; color:var(--ink); }
+button { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+/* 拿掉瀏覽器預設的點擊閃爍後，要自己給一個按下去的反饋，不然手機上點了完全沒感覺、不確定有沒有點到。 */
+button:active:not(:disabled) { opacity:.6; }
+button:disabled { cursor:not-allowed; }
+main { max-width:560px; margin:0 auto; padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(150px + env(safe-area-inset-bottom,0px)); }
+h1 { font-size:1.4rem; margin:0 0 4px; }
+.sub, .hint, .m { color:var(--muted); font-size:.9rem; margin:2px 0 8px; }
+.warn { color:var(--warn); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; }
+.card ul { margin:6px 0 0; padding-left:18px; font-size:.9rem; }
+
+/* 所有 <details> 收合區塊統一用文字三角形取代瀏覽器原生的（原生的在 summary 用 flex 排版時會消失） */
+summary { list-style:none; }
+summary::-webkit-details-marker { display:none; }
+summary::before { content:'▸'; display:inline-block; margin-right:6px; color:var(--muted); }
+details[open] > summary::before { content:'▾'; color:var(--ink); }
+/* 標題旁邊還有其他資訊（例如「目前：…」）要换行時，三角形要跟標題文字黏在一起、不要分開：
+   這種 summary 改用 .flexhead，三角形改成標題文字前面的 .caret，不用 summary::before */
+summary.flexhead::before, details[open] > summary.flexhead::before { content:none; }
+summary.flexhead .caret::before { content:'▸'; display:inline-block; margin-right:6px; color:var(--muted); }
+details[open] > summary.flexhead .caret::before { content:'▾'; color:var(--ink); }
+
+/* 週導覽（老師端月份列也在用） */
+.wnav { display:flex; align-items:center; justify-content:space-between; margin:8px 0; }
+.wnav button { min-width:52px; min-height:44px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:1.3rem; }
+.wnav button:disabled { opacity:.35; }
+
+/* 月曆選時段：星期標題列（點了整個月套用那個星期幾） */
+.wdrow { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:8px; }
+.wdbtn { border:1.5px solid var(--line); background:var(--card); font-weight:700; font-size:.8rem; padding:9px 0; border-radius:12px; }
+.wdbtn.full { background:var(--on); border-color:var(--on); color:var(--on-ink); }
+.wdbtn:disabled { opacity:.35; }
+
+/* 月曆格子：只顯示日期，點了展開下面的當天時段面板 */
+.calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.caldate {
+  aspect-ratio:1; border-radius:13px; border:0; background:none; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--ink); font-size:.92rem; font-weight:600; position:relative; font-family:inherit;
+}
+.caldate:disabled { visibility:hidden; }
+.caldate .dot { width:5px; height:5px; border-radius:50%; background:var(--on); opacity:0; }
+.caldate.has .dot { opacity:1; }
+.caldate.active { outline:2px solid var(--on); outline-offset:-2px; }
+.caldate.today .n { color:var(--on); }
+
+/* 當天時段面板：點某一天的數字才展開，只調整那一天 */
+.daypanel { margin-top:14px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px 16px; }
+.daypanel b { font-size:.9rem; }
+.hourgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:10px; }
+.hourbtn {
+  border:1.5px solid var(--line); background:var(--bg); border-radius:10px; padding:9px 0;
+  font-variant-numeric:tabular-nums; font-size:.8rem; font-weight:600; color:var(--ink); font-family:inherit;
+}
+.hourbtn.on { background:var(--on); border-color:var(--on); color:var(--on-ink); }
+/* 虛線＝老師不上班（可選，但可能改其他老師授課） */
+.hourbtn.off { border-style:dashed; }
+.hourbtn.on.off { background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.4) 0 4px, transparent 4px 8px); }
+.hourbtn.blocked { opacity:.4; border-style:dashed; background-image:repeating-linear-gradient(45deg, var(--line) 0 4px, transparent 4px 8px); }
+.hourbtn:disabled { cursor:not-allowed; }
+
+/* 選時段的滿版編輯頁（不是半版彈窗）：蓋滿整個畫面，上面返回、下面確認，中間可以捲（內容太高時的保險） */
+.fullsheet { position:fixed; inset:0; z-index:30; background:var(--bg); display:flex; flex-direction:column; }
+.fullsheet .fs-head { display:flex; align-items:center; gap:10px; padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px; flex:0 0 auto; }
+.fullsheet .fs-head b { font-size:1.02rem; }
+.fullsheet .back { width:36px; height:36px; border-radius:50%; border:1px solid var(--line); background:var(--card); font-size:1.2rem; line-height:1; flex:0 0 auto; }
+.fullsheet .fs-body { flex:1 1 auto; overflow:auto; padding:0 16px; min-height:0; }
+.fullsheet .fs-foot { flex:0 0 auto; padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); border-top:1px solid var(--line); background:var(--card); }
+
+.toast { background:var(--soft); border-radius:10px; padding:6px 12px; font-size:.88rem; margin:6px 0; }
+
+.rules { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 16px; font-size:.9rem; margin-bottom:20px; }
+.rules ul { margin:6px 0 0; padding-left:18px; }
+
+.bar { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); z-index:10; }
+.bar > div { max-width:560px; margin:0 auto; }
+.consent { font-size:.8rem; display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; color:var(--muted); }
+.send { width:100%; min-height:46px; border:0; border-radius:10px; background:var(--on); color:var(--on-ink); font-weight:700; }
+.send:disabled { opacity:.45; cursor:not-allowed; }
+.msg { white-space:pre-wrap; background:var(--soft); border-radius:10px; padding:8px 12px; margin:6px 0; font-size:.88rem; }
+.msg-edit { display:block; width:100%; max-height:42vh; overflow-y:auto; resize:vertical; background:var(--soft); border:1px solid var(--line); border-radius:10px; padding:8px 12px; margin:6px 0; font-size:.88rem; font-family:inherit; color:var(--ink); }
+
+/* 通用按鈕／列 */
+.btn { min-height:46px; border-radius:10px; border:1px solid var(--line); background:var(--card); padding:0 14px; display:inline-flex; align-items:center; justify-content:center; color:var(--ink); text-decoration:none; }
+.btn.pri { background:var(--on); border-color:var(--on); color:var(--on-ink); font-weight:700; }
+.btn.outline { background:var(--card); border-color:var(--on); color:var(--on); font-weight:700; }
+.btn:disabled { opacity:.4; cursor:not-allowed; }
+.row { display:flex; gap:8px; }
+.row .btn { flex:1; }
+.li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-top:1px solid var(--line); font-size:.92rem; flex-wrap:wrap; }
+.li button { min-height:40px; padding:0 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); font-size:.85rem; }
+.wh { font-weight:700; margin:14px 0 2px; }
+
+/* 「自動排課」頁三個收合區段：用 grid-rows 做展開/收合的動畫，不用 JS 量高度 */
+.plan-section { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
+.plan-section.open { grid-template-rows:1fr; }
+.plan-section-inner { overflow:hidden; min-height:0; }
+.pillt { font-size:.78rem; padding:2px 10px; border-radius:99px; background:var(--soft); }
+
+/* 老師端分頁 */
+.tabs { display:grid; grid-template-columns:repeat(3,1fr); }
+.tabs button, .tabs a { min-height:52px; border:0; background:none; display:flex; align-items:center; justify-content:center; text-decoration:none; color:var(--ink); font-size:1rem; }
+.tabs button[aria-selected="true"], .tabs a[aria-selected="true"] { color:var(--on); font-weight:700; box-shadow:inset 0 3px 0 var(--on); }
+
+/* 底部彈出表單（改時間／請人代／安排老師） */
+.ov { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:20; }
+.sheet { position:fixed; left:0; right:0; bottom:0; z-index:21; background:var(--card); border-radius:18px 18px 0 0; padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px)); max-height:78vh; overflow:auto; max-width:560px; margin:0 auto; }
+.tin { width:100%; min-height:46px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); padding:0 10px; font-size:16px; }
+.tags { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+.tagp { display:inline-flex; border:1px solid var(--line); border-radius:99px; overflow:hidden; background:var(--card); }
+.tagp .tag { border:0; border-radius:0; }
+.tagx { border:0; border-left:1px solid var(--line); background:none; min-width:42px; color:var(--muted); }
+.tag { min-height:40px; border-radius:99px; border:1px solid var(--line); background:var(--card); padding:0 14px; }
+.tag[aria-pressed="true"] { background:var(--on); border-color:var(--on); color:var(--on-ink); }
+.slots { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.slots button { min-height:46px; border-radius:10px; border:1.5px solid var(--line); background:var(--card); }
+.slots button[aria-pressed="true"] { background:var(--on); border-color:var(--on); color:var(--on-ink); font-weight:700; }
+.rng { display:flex; gap:8px; align-items:center; margin-top:10px; }
+.rng select, select { min-height:44px; border-radius:10px; border:1px solid var(--line); background:var(--card); padding:0 8px; font-size:16px; }
+/* select 預設寬度看選到的文字長短決定，選項文字一長（例如「★ 學生選過」）就可能把同一列的另一個
+   select 擠出畫面；兩個都用 flex:1 平分寬度，跟上面候選時段的兩欄格子排版一致，不會超出螢幕。 */
+.rng select { flex:1; min-width:0; }
+
+textarea { width:100%; resize:none; border-radius:10px; border:1px solid var(--line); background:var(--card); padding:8px; font-size:.9rem; }
+
+/* 常用時段快速套用：快速選取按鈕列＋記住設定勾選列 */
+.chiprow { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 14px; }
+.chip { min-height:38px; border-radius:99px; border:1px solid var(--line); background:var(--card); padding:0 14px; font-size:.85rem; color:var(--ink); font-family:inherit; }
+.chip.on { background:var(--on); border-color:var(--on); color:var(--on-ink); font-weight:700; }
+.remember-row { display:flex; align-items:center; gap:8px; margin:10px 0; font-size:.88rem; color:var(--ink); }
+
+:focus-visible { outline:3px solid var(--on); outline-offset:2px; }
