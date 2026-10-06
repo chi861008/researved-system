@@ -1,6 +1,7 @@
-/* 暖陶橘：米白底＋飽和陶土橘重點色 */
-:root { --bg:#efe8df; --ink:#2e2722; --muted:#9c8f7e; --line:#e3d8c9; --on:#d9622f; --on-ink:#fff; --warn:#b2501f; --card:#fbf7f1; --soft:#fbe3d4; }
-@media (prefers-color-scheme: dark) { :root { --bg:#241d16; --ink:#ede6db; --muted:#b7a890; --line:#473a2c; --on:#e8763f; --on-ink:#241206; --warn:#f0a36f; --card:#2d251c; --soft:#3d2a1c; } }
+/* 暖陶橘：米白底＋飽和陶土橘重點色。背景維持淺色、不要加深變土，對比靠「卡片更白」＋「輔助文字
+   加深」＋卡片加一點陰影來撐出層次，不是靠把背景變深來拉對比。 */
+:root { --bg:#f5efe3; --ink:#2e2722; --muted:#7d6f5c; --line:#e8dcc5; --on:#d9622f; --on-ink:#fff; --warn:#b2501f; --card:#fffdf9; --soft:#fbe3d4; }
+@media (prefers-color-scheme: dark) { :root { --bg:#241d16; --ink:#ede6db; --muted:#b7a890; --line:#4d3f2e; --on:#e8763f; --on-ink:#241206; --warn:#f0a36f; --card:#352b1f; --soft:#3d2a1c; } }
 * { box-sizing: border-box; }
 html, body { margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif; line-height:1.6; }
 /* 手機瀏覽器（尤其 LINE 內建瀏覽器）往下滑到底會有「彈一下」的橡皮筋效果，捲動時網址列收合/展開
@@ -15,8 +16,10 @@ main { max-width:560px; margin:0 auto; padding:calc(16px + env(safe-area-inset-t
 h1 { font-size:1.4rem; margin:0 0 4px; }
 .sub, .hint, .m { color:var(--muted); font-size:.9rem; margin:2px 0 8px; }
 .warn { color:var(--warn); }
-.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; box-shadow:0 1px 3px rgba(46,39,34,.07); }
 .card ul { margin:6px 0 0; padding-left:18px; font-size:.9rem; }
+/* 卡片標題跟內文字級太接近，只靠粗體撐不出層次；標題統一拉大一點、跟內容隔開一點距離。 */
+.card > b:first-child { display:block; font-size:1.08rem; margin-bottom:4px; }
 
 /* 所有 <details> 收合區塊統一用文字三角形取代瀏覽器原生的（原生的在 summary 用 flex 排版時會消失） */
 summary { list-style:none; }
