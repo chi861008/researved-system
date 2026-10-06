@@ -756,9 +756,20 @@ export default function TeacherPage() {
 
   return (<main style={{ paddingBottom: 100 }}>
     {/* ---- 已經選過「試用展示版」了，不用再把 Joanna/Coco 切換鈕秀在最上面；
-         留一個精簡的「馬上登入使用」連結，隨時可以跳去真的登入 ---- */}
+         左上角留一個正式的「用 LINE 登入」按鈕，隨時可以跳去真的登入；右上角呼應學生端的
+         「切換回老師畫面」，放一個對稱的「預覽學生畫面」連結。 ---- */}
     {!realSession && (
-      <p className="hint" style={{ textAlign: 'right' }}>展示模式（資料不會保存）・<a href="/api/auth/line/login">馬上登入使用</a></p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        <div>
+          <p className="hint" style={{ margin: '0 0 4px' }}>展示模式</p>
+          <a className="btn outline" href="/api/auth/line/login">用 LINE 登入</a>
+        </div>
+        {inviteLink && (
+          <p className="hint" style={{ margin: 0 }}>
+            <a href={inviteLink} target="_blank" rel="noopener noreferrer">👀 預覽學生畫面</a>
+          </p>
+        )}
+      </div>
     )}
     {/* ---- 月份列 ---- */}
     <div className="wnav">
@@ -881,12 +892,6 @@ export default function TeacherPage() {
               </details>
             </>}
           />
-          {/* 只是方便展示時快速切過去看，不是正式功能，所以故意做得不起眼——純文字加底線，不是按鈕。 */}
-          {inviteLink && (
-            <p className="hint" style={{ textAlign: 'center', marginTop: 8 }}>
-              <a href={inviteLink} target="_blank" rel="noopener noreferrer">👀 預覽學生畫面</a>
-            </p>
-          )}
         </div>
       )}
 
