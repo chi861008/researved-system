@@ -11,7 +11,7 @@ import {
   getMyTeacherId, getDemoTeacherPattern, saveDemoTeacherPattern, type DemoStudent, type DemoTeacher,
 } from '@/lib/teacherDemo';
 import {
-  addDays, analyzeWeeklyPattern, datesBetween, hhmm, md, parseHM,
+  addDays, analyzeWeeklyPattern, breakTimeAutoLink, datesBetween, hhmm, md, parseHM,
   runScheduling, slotKey, weekday, weekStartOf, windowList, unassignedReasonLabel,
   type UnassignedReason,
 } from '@/lib/scheduling';
@@ -424,7 +424,9 @@ export default function TeacherPage() {
       `\n\n🚫 固定無法預約：每週${WD[weeklyBlock.weekday]} ${hhmm(weeklyBlock.start)}–${hhmm(weeklyBlock.end)}（公司開會）\n💡 ${currentTeacherName} 不上班的時段若有需要，會安排其他老師授課。` +
       (inviteLink ? `\n\n📲 點這裡選時間：${inviteLink}` : '');
     // 自訂開頭／結尾只加在最外側，中間這段根據實際上班時間算出來的內容不開放自訂。
-    return (hoursPrefix ? `${hoursPrefix}\n\n` : '') + autoBody + (hoursSuffix ? `\n\n${hoursSuffix}` : '');
+    const full = (hoursPrefix ? `${hoursPrefix}\n\n` : '') + autoBody + (hoursSuffix ? `\n\n${hoursSuffix}` : '');
+    // 這是最後要送出去的文字了，這裡才套用「打斷 LINE 自動連結」，前面所有時間計算都還是乾淨的字串。
+    return breakTimeAutoLink(full);
   }, [teacherAvailability, dates, curYm, weeklyBlock, currentTeacherName, inviteLink, hoursPrefix, hoursSuffix]);
 
   // 格狀表格收起時顯示的簡短摘要（跟上面的通知文字分開，這個只在頁面裡給自己看）
@@ -1042,6 +1044,12 @@ export default function TeacherPage() {
           <b style={{ fontSize: '1.1rem' }}>{hoursPopupKind === 'opened' ? `🎉 已開放 ${+curYm.slice(5)} 月選課！` : `✅ ${+curYm.slice(5)} 月上班時段已更新`}</b>
           <p className="hint">把下面這段最新的訊息傳給學生，{hoursPopupKind === 'opened' ? '讓他們知道可以開始選時間了' : '確保他們看到的時段是最新的'}。</p>
           <EditableMsg key={`popup-${currentTeacherId}|${curYm}`} text={hoursMessage} />
+          <SaveImageBtn
+            buildSvg={() => buildHoursCalendarSvg({ year: +curYm.slice(0, 4), month: +curYm.slice(5, 7), teacherName: currentTeacherName, dates, sel: teacherAvailability, starts: STARTS, lessonMinutes: L })}
+            filename={`${curYm}-${currentTeacherName}-上班時段.png`}
+            shareText={hoursMessage}
+            style={{ marginTop: 8, width: '100%' }}
+          />
           <button className="btn pri" style={{ width: '100%', marginTop: 8 }} onClick={() => setShowHoursPopup(false)}>關閉</button>
         </div>
       </div>
