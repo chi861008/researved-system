@@ -23,12 +23,15 @@ export interface CollapsibleSlotGridProps extends SlotGridProps {
   onConfirm?: () => void | Promise<void>;
   /** 收起時「編輯時段」旁邊的額外按鈕（例如老師端的「分享／複製文字」），不用就不會多一顆按鈕。 */
   collapsedActions?: React.ReactNode;
+  /** 收起時最下面、獨立一整排的額外按鈕（例如老師端的「儲存圖片」），跟 collapsedActions 分開一列，
+   * 不會跟「編輯時段」擠在同一排。 */
+  extraAction?: React.ReactNode;
 }
 
 // 一開始只顯示文字摘要，不會看到月曆；要調整才點「編輯」，用滿版頁面打開（不是半版彈窗），
 // 按上面「‹ 返回」或下面「確認」都會收起、回到文字摘要。
 export default function CollapsibleSlotGrid({
-  label, summaryText, defaultExpanded, onUnlock, unlockLabel, headerExtra, footerExtra, confirmLabel, onConfirm, collapsedActions, ...gridProps
+  label, summaryText, defaultExpanded, onUnlock, unlockLabel, headerExtra, footerExtra, confirmLabel, onConfirm, collapsedActions, extraAction, ...gridProps
 }: CollapsibleSlotGridProps) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
   const [confirming, setConfirming] = useState(false);
@@ -43,6 +46,7 @@ export default function CollapsibleSlotGrid({
         </button>
         {collapsedActions}
       </div>
+      {extraAction}
     </div>
 
     {expanded && (

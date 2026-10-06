@@ -3,6 +3,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import CollapsibleSlotGrid from '@/components/CollapsibleSlotGrid';
 import CopyBtn from '@/components/CopyBtn';
+import SaveImageBtn from '@/components/SaveImageBtn';
+import { buildHoursCalendarSvg } from '@/lib/hoursCalendarSvg';
 import {
   DEMO_TEACHERS, DEMO_STUDENTS_BY_TEACHER, seedDemoAvailability, seedTeacherAvailability,
   getJoinedStudents, JOINED_STORAGE_KEY, getAllTeachers, ADDED_TEACHERS_STORAGE_KEY, DELETED_TEACHERS_STORAGE_KEY,
@@ -781,6 +783,13 @@ export default function TeacherPage() {
             label={`${ymLabel(curYm)} 上班時段`}
             summaryText={hoursSummaryText === '這個月還沒有設定上班時段' ? hoursSummaryText : hoursMessage}
             collapsedActions={hoursSummaryText !== '這個月還沒有設定上班時段' ? <CopyBtn text={hoursMessage} style={{ marginTop: 0, width: '100%' }} /> : undefined}
+            extraAction={hoursSummaryText !== '這個月還沒有設定上班時段' ? (
+              <SaveImageBtn
+                buildSvg={() => buildHoursCalendarSvg({ year: +curYm.slice(0, 4), month: +curYm.slice(5, 7), teacherName: currentTeacherName, dates, sel: teacherAvailability, starts: STARTS, lessonMinutes: L })}
+                filename={`${curYm}-${currentTeacherName}-上班時段.png`}
+                style={{ marginTop: 8, width: '100%' }}
+              />
+            ) : undefined}
             dates={dates} starts={STARTS} today={today} isBlocked={isBlocked}
             value={teacherAvailability} onChange={setTeacherAvailability}
             confirmLabel="完成選取／開放選課"
