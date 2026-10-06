@@ -11,7 +11,9 @@ const fmt = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 export const weekday = (d: string) => new Date(toUTC(d)).getUTCDay();
 export const addDays = (d: string, n: number) => fmt(toUTC(d) + n * 86400000);
 export const weekStartOf = (d: string) => addDays(d, -((weekday(d) + 6) % 7));
-export const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+// 中間插一個看不見的零寬空白：LINE 會把「10:00」這種格式自動變成藍色的可點連結（像在偵測電話號碼／時間），
+// 畫面上看起來一模一樣，但這個字元會打斷 LINE 的偵測規則，傳出去就不會被畫底線、變藍字。
+export const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:⁠${String(min % 60).padStart(2, '0')}`;
 export const parseHM = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + (m || 0); };
 export const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
 const WD = '日一二三四五六';
