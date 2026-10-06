@@ -233,7 +233,7 @@ export default function Page() {
         }} />
       )}
       footerExtra={!locked && (
-        <div className="remember-row">
+        <div className="card remember-row">
           <input type="checkbox" id="rememberPatternChk" checked={rememberPattern} onChange={e => setRememberPattern(e.target.checked)} />
           <label htmlFor="rememberPatternChk">記住這個設定，下個月自動帶入</label>
         </div>

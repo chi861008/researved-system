@@ -281,6 +281,13 @@ export default function TeacherPage() {
   const [planSection, setPlanSection] = useState<'schedule' | 'confirm' | 'notify'>('schedule');
   const [actingStudentId, setActingStudentId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  // 提醒文字改成浮在畫面上方、幾秒後自動消失的 toast，不要佔位置把下面的內容往下推；
+  // 每次 notice 一變就重新倒數，避免上一則還沒消失、下一則就蓋上來時提早被切斷。
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   const [pendingApprove, setPendingApprove] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rescheduleConfirmOpen, setRescheduleConfirmOpen] = useState(false);
@@ -765,7 +772,7 @@ export default function TeacherPage() {
         curYm={curYm}
       />
     ) : (<>
-      {notice && <p className="toast" role="status">{notice}</p>}
+      {notice && <p className="toast-overlay" role="status">{notice}</p>}
       {/* ---- 分頁內容 ---- */}
       {tab === 'hours' && (
         <div>
@@ -779,7 +786,7 @@ export default function TeacherPage() {
             confirmLabel="完成選取／開放選課"
             onConfirm={confirmHours}
             footerExtra={<>
-              <div className="remember-row">
+              <div className="card remember-row">
                 <input type="checkbox" id="rememberHoursChk" checked={rememberHours} onChange={e => setRememberHours(e.target.checked)} />
                 <label htmlFor="rememberHoursChk">記住這次的時段，之後新月份自動帶入</label>
               </div>

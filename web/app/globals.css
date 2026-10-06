@@ -70,13 +70,22 @@ details[open] > summary.flexhead .caret::before { content:'▾'; color:var(--ink
 
 /* 選時段的滿版編輯頁（不是半版彈窗）：蓋滿整個畫面，上面返回、下面確認，中間可以捲（內容太高時的保險） */
 .fullsheet { position:fixed; inset:0; z-index:30; background:var(--bg); display:flex; flex-direction:column; }
-.fullsheet .fs-head { display:flex; align-items:center; gap:10px; padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px; flex:0 0 auto; }
-.fullsheet .fs-head b { font-size:1.02rem; }
+.fullsheet .fs-head { display:grid; grid-template-columns:36px 1fr 36px; align-items:center; gap:10px; padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px; flex:0 0 auto; }
+.fullsheet .fs-head b { font-size:1.02rem; text-align:center; }
 .fullsheet .back { width:36px; height:36px; border-radius:50%; border:1px solid var(--line); background:var(--card); font-size:1.2rem; line-height:1; flex:0 0 auto; }
 .fullsheet .fs-body { flex:1 1 auto; overflow:auto; padding:0 16px; min-height:0; }
 .fullsheet .fs-foot { flex:0 0 auto; padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); border-top:1px solid var(--line); background:var(--card); }
 
 .toast { background:var(--soft); border-radius:10px; padding:6px 12px; font-size:.88rem; margin:6px 0; }
+
+/* 浮動提醒：蓋在畫面最上層幾秒後自動消失，不佔版面、不會把下面的內容往下推。 */
+@keyframes toast-pop { from { opacity:0; transform:translate(-50%,-6px); } to { opacity:1; transform:translate(-50%,0); } }
+.toast-overlay {
+  position:fixed; left:50%; top:calc(14px + env(safe-area-inset-top,0px)); transform:translateX(-50%);
+  max-width:calc(100% - 32px); width:fit-content; z-index:40;
+  background:var(--soft); color:var(--ink); border-radius:12px; padding:10px 16px; font-size:.9rem;
+  box-shadow:0 4px 16px rgba(0,0,0,.14); animation:toast-pop .2s ease-out;
+}
 
 .rules { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 16px; font-size:.9rem; margin-bottom:20px; }
 .rules ul { margin:6px 0 0; padding-left:18px; }
@@ -136,6 +145,7 @@ textarea { width:100%; resize:none; border-radius:10px; border:1px solid var(--l
 .chiprow { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 14px; }
 .chip { min-height:38px; border-radius:99px; border:1px solid var(--line); background:var(--card); padding:0 14px; font-size:.85rem; color:var(--ink); font-family:inherit; }
 .chip.on { background:var(--on); border-color:var(--on); color:var(--on-ink); font-weight:700; }
-.remember-row { display:flex; align-items:center; gap:8px; margin:10px 0; font-size:.88rem; color:var(--ink); }
+.remember-row { display:flex; align-items:center; gap:9px; font-size:1rem; color:var(--ink); }
+.remember-row input[type="checkbox"] { accent-color:var(--on); width:19px; height:19px; flex:0 0 auto; }
 
 :focus-visible { outline:3px solid var(--on); outline-offset:2px; }

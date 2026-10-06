@@ -16,6 +16,8 @@ export default function ManageTeachersPage() {
   // 真的用 LINE 登入的老師，看到的不該是展示模式這整套「自己加入／互相刪除」的名單——
   // 那是給示範登入測試用的。真正的老師帳號由管理者在 Supabase 的 teachers 表維護。
   const [realSession, setRealSession] = useState<{ id: string; name: string } | null>(null);
+  const [nameInput, setNameInput] = useState('');
+  const [savingName, setSavingName] = useState(false);
   const [courseNameInput, setCourseNameInput] = useState('');
   const [savingCourseName, setSavingCourseName] = useState(false);
   const [courseRulesInput, setCourseRulesInput] = useState('');
@@ -38,6 +40,7 @@ export default function ManageTeachersPage() {
         const data = await res.json().catch(() => null) as { id: string; name: string; courseName?: string; courseRules?: string; hoursPrefix?: string; hoursSuffix?: string } | null;
         if (data) {
           setRealSession({ id: data.id, name: data.name });
+          setNameInput(data.name || '');
           setCourseNameInput(data.courseName || '');
           setCourseRulesInput(data.courseRules || '');
           setHoursPrefixInput(data.hoursPrefix || '');
@@ -47,6 +50,19 @@ export default function ManageTeachersPage() {
       setAuthChecked(true);
     })();
   }, []);
+
+  async function saveName() {
+    const nm = nameInput.trim();
+    if (!nm) { setNotice('請輸入名字。'); return; }
+    setSavingName(true);
+    try {
+      const res = await fetch('/api/teacher/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      setRealSession(prev => prev ? { ...prev, name: nm } : prev);
+      setNotice(`名字已更新為「${nm}」。`);
+    } finally { setSavingName(false); }
+  }
 
   async function saveCourseName() {
     const nm = courseNameInput.trim();
@@ -116,6 +132,17 @@ export default function ManageTeachersPage() {
     {realSession ? (<>
       <p className="m" style={{ margin: 0 }}>登入中：{realSession.name}</p>
       <p className="hint">你是用 LINE 登入的正式老師帳號，只會看到自己的資料，不會看到其他老師。</p>
+
+      <div className="card">
+        <b>我的名字</b>
+        <p className="hint">會用在學生看到的文字裡（例如「XX 不上班的時段」「授課老師：XX」），也是妳登入後畫面上顯示的名字。</p>
+        <div className="rng">
+          <input className="tin" placeholder="例如：Joanna" value={nameInput}
+            onChange={e => { setNameInput(e.target.value); setNotice(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') saveName(); }} />
+          <button className="btn" style={{ flex: '0 0 auto', padding: '0 18px' }} disabled={savingName} onClick={saveName}>{savingName ? '儲存中…' : '儲存'}</button>
+        </div>
+      </div>
 
       <div className="card">
         <b>課程名稱</b>
