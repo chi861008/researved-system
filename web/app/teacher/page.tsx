@@ -881,6 +881,13 @@ export default function TeacherPage() {
               </details>
             </>}
           />
+          {inviteLink && (
+            <div className="row" style={{ marginTop: 8 }}>
+              <a className="btn outline" style={{ width: '100%' }} href={inviteLink} target="_blank" rel="noopener noreferrer">
+                👀 預覽學生畫面
+              </a>
+            </div>
+          )}
         </div>
       )}
 
