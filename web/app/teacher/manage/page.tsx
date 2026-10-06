@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import CopyBtn from '@/components/CopyBtn';
 import { getAllTeachers, addTeacher, deleteTeacher, MAIN_TEACHER_ID, type DemoTeacher } from '@/lib/teacherDemo';
+import { defaultCourseRuleLines } from '@/lib/courseDefaults';
 
 const STUDENT_LIFF_BASE = process.env.NEXT_PUBLIC_LIFF_ID ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}` : '';
 
@@ -130,7 +131,8 @@ export default function ManageTeachersPage() {
       <div className="card">
         <b>選課規則與時間說明</b>
         <p className="hint">學生端「選課規則與時間說明」裡的內容，整段自己寫，留空就會用預設的四條規則。</p>
-        <textarea className="tin" style={{ minHeight: 100, padding: 8 }} placeholder="留空＝使用預設說明文字"
+        <textarea className="tin" style={{ minHeight: 100, padding: 8 }}
+          placeholder={defaultCourseRuleLines(realSession.name).map(l => `• ${l}`).join('\n')}
           value={courseRulesInput}
           onChange={e => { setCourseRulesInput(e.target.value); setNotice(''); }} />
         <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={savingCourseRules} onClick={saveCourseRules}>{savingCourseRules ? '儲存中…' : '儲存'}</button>

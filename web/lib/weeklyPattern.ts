@@ -41,6 +41,21 @@ export function applyPatternToBlankMonth(pattern: WeeklyPattern, dates: string[]
   return out;
 }
 
+/** 比較手動調整前後的兩組選取，找出哪幾個星期幾的格子真的被改到了——只有這幾個星期幾對應的
+ * 快速選取按鈕需要取消反白，其他星期幾的按鈕不受影響（例如只調了平日晚上，週末全天的按鈕要維持選取）。 */
+export function touchedWeekdays(prev: Set<string>, next: Set<string>, dates: string[], starts: number[]): Set<number> {
+  const out = new Set<number>();
+  for (const d of dates) {
+    const wd = weekday(d);
+    if (out.has(wd)) continue;
+    for (const s of starts) {
+      const k = slotKey(d, s);
+      if (prev.has(k) !== next.has(k)) { out.add(wd); break; }
+    }
+  }
+  return out;
+}
+
 /** 快速選取：把指定星期幾的時段整批換成指定的時間（取代，不是疊加），其他星期幾不受影響。 */
 export function applyPresetToSelection(
   value: Set<string>, dates: string[], starts: number[], isBlocked: (date: string, start: number) => boolean, today: string,

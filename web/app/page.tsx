@@ -5,8 +5,9 @@ import PresetChips from '@/components/PresetChips';
 import { DEMO_PERIOD, slotBlocked, type DemoPeriod } from '@/lib/period';
 import { getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern, type DemoStudent } from '@/lib/teacherDemo';
 import { analyzeWeeklyPattern, datesBetween, md, weekday } from '@/lib/scheduling';
-import { applyPatternToBlankMonth, applyPresetToSelection, deriveWeeklyPattern, type WeeklyPattern } from '@/lib/weeklyPattern';
+import { applyPatternToBlankMonth, applyPresetToSelection, deriveWeeklyPattern, touchedWeekdays, type WeeklyPattern } from '@/lib/weeklyPattern';
 import { STUDENT_PRESETS } from '@/lib/presets';
+import { defaultCourseRuleLines } from '@/lib/courseDefaults';
 
 // 台灣日期（UTC+8）
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
@@ -169,10 +170,7 @@ export default function Page() {
         <p style={{ whiteSpace: 'pre-wrap' }}>{resolved.courseRules}</p>
       ) : (
         <ul>
-          <li>平日晚上是熱門時段，選得越多越容易安排，但不保證排到第一志願</li>
-          <li>送出不代表預約完成，請以正式課表為準</li>
-          <li>時間都無法安排時，我們會另外與你聯絡</li>
-          <li>虛線格子是 {teacherName} 不上班的時段，可能會安排其他老師授課</li>
+          {defaultCourseRuleLines(teacherName).map((line, i) => <li key={i}>{line}</li>)}
         </ul>
       )}
     </details>
@@ -196,7 +194,19 @@ export default function Page() {
       today={today}
       isBlocked={isBlocked}
       value={sel}
-      onChange={next => { setActivePresets(new Set()); setSel(next); }}
+      onChange={next => {
+        // 只取消真的被動到的星期幾對應的快速選取按鈕，沒被動到的（例如只調了平日晚上，週末全天）要維持選取。
+        const touched = touchedWeekdays(sel, next, dates, P.starts);
+        setActivePresets(prev => {
+          const n = new Set(prev);
+          for (const id of prev) {
+            const preset = STUDENT_PRESETS.find(p => p.id === id);
+            if (preset?.weekdays.some(w => touched.has(w))) n.delete(id);
+          }
+          return n;
+        });
+        setSel(next);
+      }}
       dashedSet={teacherAvailability}
       dashedHint={`虛線格子是 ${teacherName} 不上班的時段，可能會安排其他老師授課。`}
       readOnly={locked}
