@@ -787,6 +787,7 @@ export default function TeacherPage() {
               <SaveImageBtn
                 buildSvg={() => buildHoursCalendarSvg({ year: +curYm.slice(0, 4), month: +curYm.slice(5, 7), teacherName: currentTeacherName, dates, sel: teacherAvailability, starts: STARTS, lessonMinutes: L })}
                 filename={`${curYm}-${currentTeacherName}-上班時段.png`}
+                shareText={hoursMessage}
                 style={{ marginTop: 8, width: '100%' }}
               />
             ) : undefined}
