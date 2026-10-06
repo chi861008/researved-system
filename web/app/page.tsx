@@ -60,9 +60,10 @@ export default function Page() {
   const [idToken, setIdToken] = useState<string | null>(null);
   // 送出成功後鎖住格子，避免手滑誤觸就以為是要修改；要改要先按「編輯」。
   const [locked, setLocked] = useState(false);
-  // 快速選取：點一顆就是幫你把下面日曆對應的星期、時間一次勾好，不是另一套系統；手動調整過
-  // 日曆後這裡要清成 null，不然會讓人誤以為目前還是那個預設的樣子。
-  const [activePreset, setActivePreset] = useState<string | null>(null);
+  // 快速選取：點一顆就是幫你把下面日曆對應的星期、時間一次勾好，不是另一套系統；星期幾不重疊的
+  // 可以同時選好幾顆（例如平日晚上＋週末全天），手動調整過日曆後這裡要清空，不然會讓人誤以為
+  // 目前還是那些預設的樣子。
+  const [activePresets, setActivePresets] = useState<Set<string>>(new Set());
   const [rememberPattern, setRememberPattern] = useState(true);
   // 只在「打開一個還沒選過任何時段的月份」自動套用一次記住的常用時段，之後使用者自己清空
   // 不會再被蓋回去。
@@ -195,16 +196,30 @@ export default function Page() {
       today={today}
       isBlocked={isBlocked}
       value={sel}
-      onChange={next => { setActivePreset(null); setSel(next); }}
+      onChange={next => { setActivePresets(new Set()); setSel(next); }}
       dashedSet={teacherAvailability}
       dashedHint={`虛線格子是 ${teacherName} 不上班的時段，可能會安排其他老師授課。`}
       readOnly={locked}
       onUnlock={locked ? () => setLocked(false) : undefined}
       confirmLabel="完成選取"
       headerExtra={!locked && (
-        <PresetChips presets={STUDENT_PRESETS} activeId={activePreset} onPick={preset => {
-          setActivePreset(preset.id);
-          setSel(prev => applyPresetToSelection(prev, dates, P.starts, isBlocked, today, preset.weekdays, preset.starts));
+        <PresetChips presets={STUDENT_PRESETS} activeIds={activePresets} onToggle={preset => {
+          const turningOn = !activePresets.has(preset.id);
+          setActivePresets(prev => {
+            const next = new Set(prev);
+            if (turningOn) {
+              // 星期幾有重疊的預設不能同時套用（同一天不能同時是兩種時段），選了新的就取消舊的。
+              for (const other of STUDENT_PRESETS) {
+                if (other.id !== preset.id && next.has(other.id) && other.weekdays.some(w => preset.weekdays.includes(w))) next.delete(other.id);
+              }
+              next.add(preset.id);
+            } else {
+              next.delete(preset.id);
+            }
+            return next;
+          });
+          // 取消＝把這個預設的星期幾清空（不是疊加其他預設的時段，只清自己負責的那幾天）。
+          setSel(prev => applyPresetToSelection(prev, dates, P.starts, isBlocked, today, preset.weekdays, turningOn ? preset.starts : []));
         }} />
       )}
       footerExtra={!locked && (
