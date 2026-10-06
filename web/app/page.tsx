@@ -26,8 +26,14 @@ export default function Page() {
   const [realPeriod, setRealPeriod] = useState<ActivePeriod | null>(null);
   const [realTeacherAvailability, setRealTeacherAvailability] = useState<Set<string>>(new Set());
   const [noOpenPeriod, setNoOpenPeriod] = useState(false);
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+  // 在 LINE 裡用 LIFF 打開連結時，網址上的 ?t=... 一開始會被 LIFF 包成 liff.state 參數，
+  // liff.init() 跑完才會把網址復原成正常的 ?t=...。這裡要先等 LIFF 準備好才讀網址參數，
+  // 不然會在 liff.state 都還沒復原的那一瞬間讀到空的 t，誤判成「連結不完整」。
+  const [liffReady, setLiffReady] = useState(!liffId);
 
   useEffect(() => {
+    if (!liffReady) return;
     (async () => {
       const t = new URLSearchParams(window.location.search).get('t');
       if (!t) { setReady(true); return; }
@@ -47,14 +53,13 @@ export default function Page() {
       } catch { /* 網路錯誤：resolved 維持 null，顯示「連結不完整」 */ }
       setReady(true);
     })();
-  }, []);
+  }, [liffReady]);
 
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<{ t: 'idle' | 'busy' | 'ok' | 'err'; m?: string }>({ t: 'idle' });
   const [idToken, setIdToken] = useState<string | null>(null);
   // 送出成功後鎖住格子，避免手滑誤觸就以為是要修改；要改要先按「編輯」。
   const [locked, setLocked] = useState(false);
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
   // 快速選取：點一顆就是幫你把下面日曆對應的星期、時間一次勾好，不是另一套系統；手動調整過
   // 日曆後這裡要清成 null，不然會讓人誤以為目前還是那個預設的樣子。
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -69,9 +74,10 @@ export default function Page() {
       try {
         const liff = (await import('@line/liff')).default;
         await liff.init({ liffId });
-        if (!liff.isLoggedIn()) return liff.login();
+        if (!liff.isLoggedIn()) { liff.login(); return; }
         setIdToken(liff.getIDToken());
       } catch { setStatus({ t: 'err', m: '無法連接 LINE，請從官方帳號的選單重新開啟。' }); }
+      finally { setLiffReady(true); }
     })();
   }, [liffId]);
 
