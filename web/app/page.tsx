@@ -190,6 +190,7 @@ export default function Page() {
   if (!P) return <main />; // 真老師模式：還在讀取這個月的設定
 
   return (<main>
+    {!resolved.isReal && <p className="hint" style={{ textAlign: 'right' }}><a href="/teacher">👀 切換回老師畫面</a></p>}
     <h1>🌸 {+P.ym.slice(5)} 月{courseName}選課開始囉！</h1>
     <p className="sub">{joined.name} 你好，請勾選這個月所有可以上課的日期與時間。等大家都填寫完成，我們會安排課表，並用 LINE 個別通知你上課日期、時間及授課老師。</p>
     <details className="card">
@@ -283,6 +284,7 @@ function JoinView({ teacherId, teacherName, onJoined }: { teacherId: string; tea
     onJoined(joinAsStudent(teacherId, nm));
   }
   return (<main>
+    <p className="hint" style={{ textAlign: 'right' }}><a href="/teacher">👀 切換回老師畫面</a></p>
     <h1>🌸 加入 {teacherName} 的皮拉提斯課程</h1>
     <p className="sub">第一次使用，請輸入你的名字，老師才能在名單裡認出你。之後用同一個連結打開會直接記得你，不用再填一次。</p>
     <div className="card">

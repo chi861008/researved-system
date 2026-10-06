@@ -881,12 +881,11 @@ export default function TeacherPage() {
               </details>
             </>}
           />
+          {/* 只是方便展示時快速切過去看，不是正式功能，所以故意做得不起眼——純文字加底線，不是按鈕。 */}
           {inviteLink && (
-            <div className="row" style={{ marginTop: 8 }}>
-              <a className="btn outline" style={{ width: '100%' }} href={inviteLink} target="_blank" rel="noopener noreferrer">
-                👀 預覽學生畫面
-              </a>
-            </div>
+            <p className="hint" style={{ textAlign: 'center', marginTop: 8 }}>
+              <a href={inviteLink} target="_blank" rel="noopener noreferrer">👀 預覽學生畫面</a>
+            </p>
           )}
         </div>
       )}
