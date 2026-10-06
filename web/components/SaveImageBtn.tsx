@@ -34,7 +34,7 @@ export default function SaveImageBtn({ buildSvg, filename, shareText, style }: {
 
   return (
     <button className="btn" style={style} disabled={state === 'busy'} onClick={go}>
-      {state === 'busy' ? '處理中…' : state === 'done' ? '已處理' : '分享／儲存圖片'}
+      {state === 'busy' ? '處理中…' : state === 'done' ? '已處理' : '分享圖片＋文字'}
     </button>
   );
 }
