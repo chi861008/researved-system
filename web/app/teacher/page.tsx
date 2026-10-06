@@ -123,14 +123,21 @@ async function fetchRealTeacherState(): Promise<{ session: { id: string; name: s
 const nowStr = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ');
 
 // 可以先編輯內容再複製／分享的文字框（例如改個稱呼、補一句話），不是唯讀的。
-function EditableMsg({ text }: { text: string }) {
+function EditableMsg({ text, extraAction }: { text: string; extraAction?: (value: string) => React.ReactNode }) {
   const [value, setValue] = useState(text);
   // 高度只用「一開始」的內容算一次、固定下來（不會隨打字即時變動，避免編輯時視窗一直跳動），
   // 多留一點空間給手機上的自動換行，讓正常長度的訊息不用捲動就看得到全部。
   const [rows] = useState(() => Math.min(Math.max(text.split('\n').length + 4, 6), 14));
   return (<>
     <textarea className="msg-edit" rows={rows} value={value} onChange={e => setValue(e.target.value)} />
-    <CopyBtn text={value} />
+    {extraAction ? (
+      <div className="row" style={{ marginTop: 6 }}>
+        <CopyBtn text={value} style={{ marginTop: 0 }} />
+        {extraAction(value)}
+      </div>
+    ) : (
+      <CopyBtn text={value} />
+    )}
   </>);
 }
 
@@ -1040,17 +1047,24 @@ export default function TeacherPage() {
     {/* ---- 剛開放選課：強提醒把通知文字傳給學生 ---- */}
     {showHoursPopup && (
       <div className="ov" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowHoursPopup(false)}>
-        <div className="card" style={{ maxWidth: 420, width: '100%', margin: 0, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-          <b style={{ fontSize: '1.1rem' }}>{hoursPopupKind === 'opened' ? `🎉 已開放 ${+curYm.slice(5)} 月選課！` : `✅ ${+curYm.slice(5)} 月上班時段已更新`}</b>
+        <div className="card" style={{ maxWidth: 420, width: '100%', margin: 0, maxHeight: '85vh', overflow: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+          <button type="button" aria-label="關閉" onClick={() => setShowHoursPopup(false)}
+            style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--muted)', fontSize: '1.1rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+          <b style={{ fontSize: '1.1rem', display: 'block', paddingRight: 36 }}>{hoursPopupKind === 'opened' ? `🎉 已開放 ${+curYm.slice(5)} 月選課！` : `✅ ${+curYm.slice(5)} 月上班時段已更新`}</b>
           <p className="hint">把下面這段最新的訊息傳給學生，{hoursPopupKind === 'opened' ? '讓他們知道可以開始選時間了' : '確保他們看到的時段是最新的'}。</p>
-          <EditableMsg key={`popup-${currentTeacherId}|${curYm}`} text={hoursMessage} />
-          <SaveImageBtn
-            buildSvg={() => buildHoursCalendarSvg({ year: +curYm.slice(0, 4), month: +curYm.slice(5, 7), teacherName: currentTeacherName, dates, sel: teacherAvailability, starts: STARTS, lessonMinutes: L })}
-            filename={`${curYm}-${currentTeacherName}-上班時段.png`}
-            shareText={hoursMessage}
-            style={{ marginTop: 8, width: '100%' }}
+          <EditableMsg
+            key={`popup-${currentTeacherId}|${curYm}`}
+            text={hoursMessage}
+            extraAction={value => (
+              <SaveImageBtn
+                buildSvg={() => buildHoursCalendarSvg({ year: +curYm.slice(0, 4), month: +curYm.slice(5, 7), teacherName: currentTeacherName, dates, sel: teacherAvailability, starts: STARTS, lessonMinutes: L })}
+                filename={`${curYm}-${currentTeacherName}-上班時段.png`}
+                shareText={value}
+                primary
+                style={{ marginTop: 0 }}
+              />
+            )}
           />
-          <button className="btn pri" style={{ width: '100%', marginTop: 8 }} onClick={() => setShowHoursPopup(false)}>關閉</button>
         </div>
       </div>
     )}
