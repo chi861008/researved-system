@@ -791,15 +791,15 @@ export default function TeacherPage() {
             key={currentTeacherId}
             label={`${ymLabel(curYm)} 上班時段`}
             summaryText={hoursSummaryText === '這個月還沒有設定上班時段' ? hoursSummaryText : hoursMessage}
-            collapsedActions={hoursSummaryText !== '這個月還沒有設定上班時段' ? <CopyBtn text={hoursMessage} style={{ marginTop: 0, width: '100%' }} /> : undefined}
-            extraAction={hoursSummaryText !== '這個月還沒有設定上班時段' ? (
+            collapsedActions={hoursSummaryText !== '這個月還沒有設定上班時段' ? (<>
+              <CopyBtn text={hoursMessage} style={{ marginTop: 0 }} />
               <SaveImageBtn
                 buildSvg={() => buildHoursCalendarSvg({ year: +curYm.slice(0, 4), month: +curYm.slice(5, 7), teacherName: currentTeacherName, dates, sel: teacherAvailability, starts: STARTS, lessonMinutes: L })}
                 filename={`${curYm}-${currentTeacherName}-上班時段.png`}
                 shareText={hoursMessage}
-                style={{ marginTop: 8, width: '100%' }}
+                style={{ marginTop: 0 }}
               />
-            ) : undefined}
+            </>) : undefined}
             dates={dates} starts={STARTS} today={today} isBlocked={isBlocked}
             value={teacherAvailability} onChange={setTeacherAvailability}
             confirmLabel="完成選取／開放選課"

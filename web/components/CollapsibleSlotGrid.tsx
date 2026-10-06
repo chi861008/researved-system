@@ -21,17 +21,15 @@ export interface CollapsibleSlotGridProps extends SlotGridProps {
    * 這段還在跑的時候按鈕會顯示「處理中」並停用，跑完才收合，避免真老師模式打資料庫的空檔
    * 看起來像沒反應。 */
   onConfirm?: () => void | Promise<void>;
-  /** 收起時「編輯時段」旁邊的額外按鈕（例如老師端的「分享／複製文字」），不用就不會多一顆按鈕。 */
+  /** 收起時「編輯時段」下面另外一整排的額外按鈕（例如老師端的「分享／複製文字」＋「分享圖片＋文字」），
+   * 跟「編輯時段」分開一列，視覺上是另一組動作；不用就不會多這一排。 */
   collapsedActions?: React.ReactNode;
-  /** 收起時最下面、獨立一整排的額外按鈕（例如老師端的「儲存圖片」），跟 collapsedActions 分開一列，
-   * 不會跟「編輯時段」擠在同一排。 */
-  extraAction?: React.ReactNode;
 }
 
 // 一開始只顯示文字摘要，不會看到月曆；要調整才點「編輯」，用滿版頁面打開（不是半版彈窗），
 // 按上面「‹ 返回」或下面「確認」都會收起、回到文字摘要。
 export default function CollapsibleSlotGrid({
-  label, summaryText, defaultExpanded, onUnlock, unlockLabel, headerExtra, footerExtra, confirmLabel, onConfirm, collapsedActions, extraAction, ...gridProps
+  label, summaryText, defaultExpanded, onUnlock, unlockLabel, headerExtra, footerExtra, confirmLabel, onConfirm, collapsedActions, ...gridProps
 }: CollapsibleSlotGridProps) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
   const [confirming, setConfirming] = useState(false);
@@ -44,9 +42,8 @@ export default function CollapsibleSlotGrid({
         <button className="btn outline" style={{ width: '100%' }} onClick={() => setExpanded(true)}>
           {gridProps.readOnly ? '已送出／編輯時段' : '編輯時段'}
         </button>
-        {collapsedActions}
       </div>
-      {extraAction}
+      {collapsedActions && <div className="row" style={{ marginTop: 8 }}>{collapsedActions}</div>}
     </div>
 
     {expanded && (
