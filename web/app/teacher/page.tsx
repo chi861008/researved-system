@@ -8,7 +8,8 @@ import { buildHoursCalendarSvg } from '@/lib/hoursCalendarSvg';
 import {
   DEMO_TEACHERS, DEMO_STUDENTS_BY_TEACHER, seedDemoAvailability, seedTeacherAvailability,
   getJoinedStudents, JOINED_STORAGE_KEY, getAllTeachers, ADDED_TEACHERS_STORAGE_KEY, DELETED_TEACHERS_STORAGE_KEY,
-  getMyTeacherId, getDemoTeacherPattern, saveDemoTeacherPattern, type DemoStudent, type DemoTeacher,
+  getMyTeacherId, getDemoTeacherPattern, saveDemoTeacherPattern, getDemoSubmittedAvailability, SUBMITTED_AVAIL_STORAGE_PREFIX,
+  type DemoStudent, type DemoTeacher,
 } from '@/lib/teacherDemo';
 import {
   addDays, analyzeWeeklyPattern, breakTimeAutoLink, datesBetween, hhmm, md, parseHM,
@@ -331,14 +332,24 @@ export default function TeacherPage() {
         if (!cur) return prev;
         const existingIds = new Set(cur.students.map(s => s.id));
         const toAdd = joined.filter(j => !existingIds.has(j.id));
-        if (!toAdd.length) return prev;
+        // 學生送出的時段存在另一組 localStorage key（見 saveDemoSubmittedAvailability），每次都要
+        // 重新比對一次，不是只有「剛加入」的學生才需要——已經在名單裡的學生之後才送出，也要能看到。
         const nextAvail = new Map(cur.studentAvailability);
-        for (const s of toAdd) if (!nextAvail.has(s.id)) nextAvail.set(s.id, new Set());
+        let availChanged = false;
+        for (const s of joined) {
+          const submitted = new Set(getDemoSubmittedAvailability(teacherId, s.id));
+          const existing = nextAvail.get(s.id);
+          const same = existing && existing.size === submitted.size && [...existing].every(k => submitted.has(k));
+          if (!same) { nextAvail.set(s.id, submitted); availChanged = true; }
+        }
+        if (!toAdd.length && !availChanged) return prev;
         return { ...prev, [teacherId]: { ...cur, students: [...cur.students, ...toAdd], studentAvailability: nextAvail } };
       });
     }
     mergeJoined(currentTeacherId);
-    const onStorage = (e: StorageEvent) => { if (e.key === JOINED_STORAGE_KEY) mergeJoined(currentTeacherId); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === JOINED_STORAGE_KEY || e.key?.startsWith(SUBMITTED_AVAIL_STORAGE_PREFIX)) mergeJoined(currentTeacherId);
+    };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [currentTeacherId]);

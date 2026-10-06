@@ -17,10 +17,9 @@ export async function POST(req: Request) {
       return bad('時段格式不正確');
 
   // 展示模式：teacherId 不是真的（或沒帶）時，維持原本的模擬行為，完全不碰 Supabase。
-  if (!teacherId || !isUuid(teacherId)) {
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ ok: true, demo: true });
-    return bad('資料庫尚未接上，請稍後再試', 503);
-  }
+  // 這跟有沒有設定 SUPABASE_SERVICE_ROLE_KEY 無關：就算真老師模式已經接上資料庫，展示模式的連結
+  // 本來就一直都是帶非 UUID 的 teacherId，不是「資料庫還沒接上」的錯誤狀態。
+  if (!teacherId || !isUuid(teacherId)) return NextResponse.json({ ok: true, demo: true });
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return bad('資料庫尚未設定', 503);

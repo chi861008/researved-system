@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import CollapsibleSlotGrid from '@/components/CollapsibleSlotGrid';
 import PresetChips from '@/components/PresetChips';
 import { DEMO_PERIOD, slotBlocked, type DemoPeriod } from '@/lib/period';
-import { getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern, type DemoStudent } from '@/lib/teacherDemo';
+import { getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern, saveDemoSubmittedAvailability, type DemoStudent } from '@/lib/teacherDemo';
 import { analyzeWeeklyPattern, datesBetween, md, weekday } from '@/lib/scheduling';
 import { applyPatternToBlankMonth, applyPresetToSelection, deriveWeeklyPattern, touchedWeekdays, type WeeklyPattern } from '@/lib/weeklyPattern';
 import { STUDENT_PRESETS } from '@/lib/presets';
@@ -144,8 +144,12 @@ export default function Page() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || '送出失敗');
-      // 展示模式沒有真的資料庫，「記住」要自己存進 localStorage；真老師模式由伺服器直接存進 students 表。
-      if (j.demo && rememberPattern) saveDemoStudentPattern(resolved.id, joined.id, deriveWeeklyPattern(sel, dates, P.starts));
+      // 展示模式沒有真的資料庫：實際送出的時段、「記住」的常用時段，都要自己存進 localStorage，
+      // 老師端（同一瀏覽器的另一個分頁，或重新整理後）才看得到這位學生送出了什麼。
+      if (j.demo) {
+        saveDemoSubmittedAvailability(resolved.id, joined.id, [...sel]);
+        if (rememberPattern) saveDemoStudentPattern(resolved.id, joined.id, deriveWeeklyPattern(sel, dates, P.starts));
+      }
       setStatus({ t: 'ok', m: (j.demo ? '展示模式：已模擬送出（尚未寫入資料庫）。' : '已送出！排好後會用 LINE 個別通知你上課日期、時間及授課老師。') + '要修改請按「編輯時段」。' });
       setLocked(true);
     } catch (e) { setStatus({ t: 'err', m: (e as Error).message + '，請稍後再試。' }); }
@@ -158,7 +162,9 @@ export default function Page() {
     return () => clearTimeout(timer);
   }, [status.m]);
 
-  const needLogin = !!liffId && !idToken;
+  // 展示模式的連結完全跳過 LIFF 登入（見上面那段註解），所以 idToken 本來就會一直是 null，
+  // 不能把這個也當成「還沒登入」，不然展示模式送出按鈕會被一直鎖住。
+  const needLogin = !!resolved?.isReal && !!liffId && !idToken;
 
   if (!ready) return <main />;
 

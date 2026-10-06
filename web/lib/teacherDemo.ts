@@ -109,6 +109,23 @@ export function joinAsStudent(teacherId: string, name: string): DemoStudent {
   return student;
 }
 
+// ---------- 展示用「學生送出的時段」----------
+// 學生送出時段這個 API（/api/availability）在展示模式下只回傳 {ok:true}，不會真的寫進任何資料庫，
+// 老師端是另一個 React 分頁、另一份記憶體，沒有這一段的話老師永遠看不到剛剛那位學生送出了什麼。
+export const SUBMITTED_AVAIL_STORAGE_PREFIX = 'pilates-demo-submitted-avail-';
+
+/** 學生送出時段後：把實際勾選的格子存起來，老師那頁（同一瀏覽器的另一個分頁，或重新整理後）才讀得到。 */
+export function saveDemoSubmittedAvailability(teacherId: string, studentId: string, keys: string[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(SUBMITTED_AVAIL_STORAGE_PREFIX + teacherId + '|' + studentId, JSON.stringify(keys));
+}
+
+/** 老師端讀取某位（透過邀請連結加入的）學生實際送出過的時段。 */
+export function getDemoSubmittedAvailability(teacherId: string, studentId: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(window.localStorage.getItem(SUBMITTED_AVAIL_STORAGE_PREFIX + teacherId + '|' + studentId) || '[]'); } catch { return []; }
+}
+
 // ---------- 展示用「新增老師」----------
 // 對應真實規格：新增老師＝主要老師把同事的 LINE 帳號加進白名單，一次性設定、不是對方自己填名字加入。
 // 展示模式一樣先存在 localStorage，讓畫面上新增的老師重新整理後還在。
