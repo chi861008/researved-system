@@ -16,7 +16,7 @@ const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 // 形狀一樣，剩下的畫面邏輯（月曆、isBlocked、送出）兩邊共用，不用另外分支。
 type ActivePeriod = Pick<DemoPeriod, 'ym' | 'from' | 'to' | 'starts' | 'lessonMinutes' | 'weeklyBlocks'>;
 // 真老師模式的學生記錄多帶一個「記住的常用時段」，展示模式永遠是 undefined，從 localStorage 另外查。
-type JoinedStudent = DemoStudent & { weeklyPattern?: WeeklyPattern | null };
+type JoinedStudent = DemoStudent & { weeklyPattern?: WeeklyPattern | null; existingAvailability?: string[] };
 
 export default function Page() {
   // 用邀請連結帶的 ?t=teacherId 分辨「這是哪位老師的學生」：先查展示名單（完全不變），
@@ -69,6 +69,17 @@ export default function Page() {
   // 只在「打開一個還沒選過任何時段的月份」自動套用一次記住的常用時段，之後使用者自己清空
   // 不會再被蓋回去。
   const patternAppliedRef = useRef(false);
+
+  // 真老師模式：加入時如果查到這個學生本月已經送出過時段，直接把畫面還原成跟上次送出時一樣
+  // （鎖定＋顯示她真正選過的格子），不然關掉連結重開會看起來像沒填過，容易重複填寫。
+  function handleJoined(s: JoinedStudent) {
+    setJoined(s);
+    if (s.existingAvailability?.length) {
+      setSel(new Set(s.existingAvailability));
+      setLocked(true);
+      patternAppliedRef.current = true;
+    }
+  }
 
   useEffect(() => { // 在 LINE 內開啟時自動登入，取得學生身分
     if (!liffId) return;
@@ -156,7 +167,7 @@ export default function Page() {
 
   if (!joined) {
     return resolved.isReal
-      ? <RealJoinView teacherId={resolved.id} teacherName={resolved.name} courseName={courseName} idToken={idToken} needLogin={needLogin} onJoined={setJoined} />
+      ? <RealJoinView teacherId={resolved.id} teacherName={resolved.name} courseName={courseName} idToken={idToken} needLogin={needLogin} onJoined={handleJoined} />
       : <JoinView teacherId={resolved.id} teacherName={resolved.name} onJoined={setJoined} />;
   }
 
