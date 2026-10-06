@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import CollapsibleSlotGrid from '@/components/CollapsibleSlotGrid';
 import PresetChips from '@/components/PresetChips';
 import { DEMO_PERIOD, slotBlocked, type DemoPeriod } from '@/lib/period';
-import { getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern, saveDemoSubmittedAvailability, type DemoStudent } from '@/lib/teacherDemo';
+import { getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern, saveDemoSubmittedAvailability, getDemoTeacherSettings, type DemoStudent } from '@/lib/teacherDemo';
 import { analyzeWeeklyPattern, datesBetween, md, weekday } from '@/lib/scheduling';
 import { applyPatternToBlankMonth, applyPresetToSelection, deriveWeeklyPattern, touchedWeekdays, type WeeklyPattern } from '@/lib/weeklyPattern';
 import { STUDENT_PRESETS } from '@/lib/presets';
@@ -40,7 +40,9 @@ export default function Page() {
       if (!t) { setReady(true); return; }
       const demo = getAllTeachers().find(x => x.id === t);
       if (demo) {
-        setResolved({ id: demo.id, name: demo.name, isReal: false });
+        // 老師管理頁的展示模式也能改課程名稱／選課規則了，這裡要套用，不然展示模式永遠只看得到預設值。
+        const s = getDemoTeacherSettings(demo.id);
+        setResolved({ id: demo.id, name: demo.name, isReal: false, courseName: s.courseName, courseRules: s.courseRules });
         setJoined(getMyJoin(demo.id));
         setReady(true);
         return;

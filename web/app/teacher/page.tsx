@@ -9,6 +9,7 @@ import {
   DEMO_TEACHERS, DEMO_STUDENTS_BY_TEACHER, seedDemoAvailability, seedTeacherAvailability,
   getJoinedStudents, JOINED_STORAGE_KEY, getAllTeachers, ADDED_TEACHERS_STORAGE_KEY, DELETED_TEACHERS_STORAGE_KEY,
   getMyTeacherId, getDemoTeacherPattern, saveDemoTeacherPattern, getDemoSubmittedAvailability, SUBMITTED_AVAIL_STORAGE_PREFIX,
+  getDemoTeacherSettings, TEACHER_SETTINGS_STORAGE_PREFIX,
   type DemoStudent, type DemoTeacher,
 } from '@/lib/teacherDemo';
 import {
@@ -187,7 +188,9 @@ export default function TeacherPage() {
     // 如果這台瀏覽器之前用「自己加入」的方式建立過老師身份，一進頁面就預設顯示那位老師，不用每次手動切換。
     const mine = getMyTeacherId();
     if (mine && getAllTeachers().some(t => t.id === mine)) setCurrentTeacherId(mine);
-    const onStorage = (e: StorageEvent) => { if (e.key === ADDED_TEACHERS_STORAGE_KEY || e.key === DELETED_TEACHERS_STORAGE_KEY) mergeTeachers(); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === ADDED_TEACHERS_STORAGE_KEY || e.key === DELETED_TEACHERS_STORAGE_KEY || e.key?.startsWith(TEACHER_SETTINGS_STORAGE_PREFIX)) mergeTeachers();
+    };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
@@ -353,6 +356,21 @@ export default function TeacherPage() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [currentTeacherId]);
+
+  // 展示模式：「上班時段通知文字」的開頭／結尾在「老師管理」頁設定、存在 localStorage，這裡要讀回來
+  // 套用，不然展示模式永遠是空字串（跟真老師那邊靠 fetchRealTeacherState 設定是同一件事，只是換來源）。
+  useEffect(() => {
+    if (realSession) return;
+    function loadHoursTemplate() {
+      const s = getDemoTeacherSettings(currentTeacherId);
+      setHoursPrefix(s.hoursPrefix || '');
+      setHoursSuffix(s.hoursSuffix || '');
+    }
+    loadHoursTemplate();
+    const onStorage = (e: StorageEvent) => { if (e.key === TEACHER_SETTINGS_STORAGE_PREFIX + currentTeacherId) loadHoursTemplate(); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [currentTeacherId, realSession]);
 
   const inviteLink = STUDENT_LIFF_BASE ? `${STUDENT_LIFF_BASE}?t=${currentTeacherId}` : (origin ? `${origin}/?t=${currentTeacherId}` : '');
 
@@ -755,15 +773,12 @@ export default function TeacherPage() {
   }
 
   return (<main style={{ paddingBottom: 100 }}>
-    {/* ---- 已經選過「試用展示版」了，不用再把 Joanna/Coco 切換鈕秀在最上面；
-         左上角留一個正式的「用 LINE 登入」按鈕，隨時可以跳去真的登入；右上角呼應學生端的
-         「切換回老師畫面」，放一個對稱的「預覽學生畫面」連結。 ---- */}
+    {/* ---- 已經選過「試用展示版」了，不用再把 Joanna/Coco 切換鈕秀在最上面；「用 LINE 登入」
+         放回「老師管理」頁，這裡只留「展示模式」字樣，右上角呼應學生端的「切換回老師畫面」，
+         放一個對稱的「預覽學生畫面」連結。 ---- */}
     {!realSession && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-        <div>
-          <p className="hint" style={{ margin: '0 0 4px' }}>展示模式</p>
-          <a className="btn outline" href="/api/auth/line/login">用 LINE 登入</a>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        <p className="hint" style={{ margin: 0 }}>展示模式</p>
         {inviteLink && (
           <p className="hint" style={{ margin: 0 }}>
             <a href={inviteLink} target="_blank" rel="noopener noreferrer">👀 預覽學生畫面</a>

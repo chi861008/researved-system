@@ -2,7 +2,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import CopyBtn from '@/components/CopyBtn';
-import { getAllTeachers, addTeacher, deleteTeacher, MAIN_TEACHER_ID, type DemoTeacher } from '@/lib/teacherDemo';
+import {
+  getAllTeachers, addTeacher, deleteTeacher, getMyTeacherId, MAIN_TEACHER_ID,
+  getDemoTeacherSettings, saveDemoTeacherSettings, type DemoTeacher,
+} from '@/lib/teacherDemo';
 import { defaultCourseRuleLines } from '@/lib/courseDefaults';
 
 const STUDENT_LIFF_BASE = process.env.NEXT_PUBLIC_LIFF_ID ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}` : '';
@@ -28,9 +31,12 @@ export default function ManageTeachersPage() {
   // 還不知道是不是真老師之前先不要畫面板，不然會先閃一下展示模式的「老師名單」才跳到真老師的設定頁，
   // 跟 /teacher 那邊是同一個問題、同一個修法。
   const [authChecked, setAuthChecked] = useState(false);
+  // 展示模式：這些設定是「哪一位老師」的——預設最早建立的那位，除非這台瀏覽器之前自己加入過另一位。
+  const [demoTeacherId, setDemoTeacherId] = useState(MAIN_TEACHER_ID);
 
   useEffect(() => {
-    setTeachers(getAllTeachers());
+    const allTeachers = getAllTeachers();
+    setTeachers(allTeachers);
     setOrigin(window.location.origin);
     (async () => {
       // 一支 /api/teacher/state 就同時拿到 id/name 跟課程名稱／規則／通知文字設定，不用先問
@@ -46,6 +52,17 @@ export default function ManageTeachersPage() {
           setHoursPrefixInput(data.hoursPrefix || '');
           setHoursSuffixInput(data.hoursSuffix || '');
         }
+      } else {
+        // 展示模式：這些設定存在 localStorage，不用問資料庫——套用目前這台瀏覽器對應的老師身份。
+        const mine = getMyTeacherId();
+        const tid = mine && allTeachers.some(t => t.id === mine) ? mine : MAIN_TEACHER_ID;
+        setDemoTeacherId(tid);
+        const s = getDemoTeacherSettings(tid);
+        setNameInput(s.name || allTeachers.find(t => t.id === tid)?.name || '');
+        setCourseNameInput(s.courseName || '');
+        setCourseRulesInput(s.courseRules || '');
+        setHoursPrefixInput(s.hoursPrefix || '');
+        setHoursSuffixInput(s.hoursSuffix || '');
       }
       setAuthChecked(true);
     })();
@@ -56,10 +73,15 @@ export default function ManageTeachersPage() {
     if (!nm) { setNotice('請輸入名字。'); return; }
     setSavingName(true);
     try {
-      const res = await fetch('/api/teacher/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
-      setRealSession(prev => prev ? { ...prev, name: nm } : prev);
+      if (realSession) {
+        const res = await fetch('/api/teacher/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+        setRealSession(prev => prev ? { ...prev, name: nm } : prev);
+      } else {
+        saveDemoTeacherSettings(demoTeacherId, { name: nm });
+        setTeachers(getAllTeachers());
+      }
       setNotice(`名字已更新為「${nm}」。`);
     } finally { setSavingName(false); }
   }
@@ -69,9 +91,13 @@ export default function ManageTeachersPage() {
     if (!nm) { setNotice('請輸入課程名稱。'); return; }
     setSavingCourseName(true);
     try {
-      const res = await fetch('/api/teacher/course-name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseName: nm }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      if (realSession) {
+        const res = await fetch('/api/teacher/course-name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseName: nm }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      } else {
+        saveDemoTeacherSettings(demoTeacherId, { courseName: nm });
+      }
       setNotice(`課程名稱已更新為「${nm}」。`);
     } finally { setSavingCourseName(false); }
   }
@@ -79,9 +105,13 @@ export default function ManageTeachersPage() {
   async function saveCourseRules() {
     setSavingCourseRules(true);
     try {
-      const res = await fetch('/api/teacher/course-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseRules: courseRulesInput }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      if (realSession) {
+        const res = await fetch('/api/teacher/course-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ courseRules: courseRulesInput }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      } else {
+        saveDemoTeacherSettings(demoTeacherId, { courseRules: courseRulesInput.trim() });
+      }
       setNotice(courseRulesInput.trim() ? '選課規則與時間說明已更新。' : '已清空，學生端會改回預設說明文字。');
     } finally { setSavingCourseRules(false); }
   }
@@ -89,9 +119,13 @@ export default function ManageTeachersPage() {
   async function saveHoursTemplate() {
     setSavingHoursTemplate(true);
     try {
-      const res = await fetch('/api/teacher/hours-template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: hoursPrefixInput, suffix: hoursSuffixInput }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      if (realSession) {
+        const res = await fetch('/api/teacher/hours-template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: hoursPrefixInput, suffix: hoursSuffixInput }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setNotice(data?.error || '儲存失敗，請稍後再試。'); return; }
+      } else {
+        saveDemoTeacherSettings(demoTeacherId, { hoursPrefix: hoursPrefixInput.trim(), hoursSuffix: hoursSuffixInput.trim() });
+      }
       setNotice('上班時段通知文字的開頭／結尾已更新。');
     } finally { setSavingHoursTemplate(false); }
   }
@@ -129,51 +163,56 @@ export default function ManageTeachersPage() {
     <h1>管理老師</h1>
     {notice && <p className="toast" role="status">{notice}</p>}
 
+    {!realSession && (<>
+      <p className="hint">目前是展示模式，下面的設定存在這台瀏覽器裡，不會真的送進資料庫；正式老師請改用 LINE 登入。</p>
+      <a className="btn outline" href="/api/auth/line/login" style={{ width: '100%', marginBottom: 16 }}>用 LINE 登入</a>
+    </>)}
+
+    <div className="card">
+      <b>我的名字</b>
+      <div className="rng">
+        <input className="tin" placeholder="例如：Joanna" value={nameInput}
+          onChange={e => { setNameInput(e.target.value); setNotice(''); }}
+          onKeyDown={e => { if (e.key === 'Enter') saveName(); }} />
+        <button className="btn" style={{ flex: '0 0 auto', padding: '0 18px' }} disabled={savingName} onClick={saveName}>{savingName ? '儲存中…' : '儲存'}</button>
+      </div>
+    </div>
+
+    <div className="card">
+      <b>課程名稱</b>
+      <div className="rng">
+        <input className="tin" placeholder="例如：皮拉提斯" value={courseNameInput}
+          onChange={e => { setCourseNameInput(e.target.value); setNotice(''); }}
+          onKeyDown={e => { if (e.key === 'Enter') saveCourseName(); }} />
+        <button className="btn" style={{ flex: '0 0 auto', padding: '0 18px' }} disabled={savingCourseName} onClick={saveCourseName}>{savingCourseName ? '儲存中…' : '儲存'}</button>
+      </div>
+    </div>
+
+    <div className="card">
+      <b>選課規則與時間說明</b>
+      <p className="hint">學生端「選課規則與時間說明」裡的內容，整段自己寫，留空就會用預設的四條規則。</p>
+      <textarea className="tin" style={{ minHeight: 100, padding: 8 }}
+        placeholder={defaultCourseRuleLines(realSession?.name || nameInput || '老師').map(l => `• ${l}`).join('\n')}
+        value={courseRulesInput}
+        onChange={e => { setCourseRulesInput(e.target.value); setNotice(''); }} />
+      <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={savingCourseRules} onClick={saveCourseRules}>{savingCourseRules ? '儲存中…' : '儲存'}</button>
+    </div>
+
+    <div className="card">
+      <b>上班時段通知文字</b>
+      <p className="hint">中間實際上班時間、固定會議時間、邀請連結是自動算出來的，不能改；這裡只能加開頭的問候語、結尾的補充說明，留空就不會加。</p>
+      <p className="m" style={{ marginBottom: 2 }}>開頭</p>
+      <textarea className="tin" style={{ minHeight: 60, padding: 8 }} placeholder="例如：各位同學好 🌸"
+        value={hoursPrefixInput}
+        onChange={e => { setHoursPrefixInput(e.target.value); setNotice(''); }} />
+      <p className="m" style={{ margin: '8px 0 2px' }}>結尾</p>
+      <textarea className="tin" style={{ minHeight: 60, padding: 8 }} placeholder="例如：有問題歡迎直接回覆我"
+        value={hoursSuffixInput}
+        onChange={e => { setHoursSuffixInput(e.target.value); setNotice(''); }} />
+      <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={savingHoursTemplate} onClick={saveHoursTemplate}>{savingHoursTemplate ? '儲存中…' : '儲存'}</button>
+    </div>
+
     {realSession ? (<>
-      <div className="card">
-        <b>我的名字</b>
-        <div className="rng">
-          <input className="tin" placeholder="例如：Joanna" value={nameInput}
-            onChange={e => { setNameInput(e.target.value); setNotice(''); }}
-            onKeyDown={e => { if (e.key === 'Enter') saveName(); }} />
-          <button className="btn" style={{ flex: '0 0 auto', padding: '0 18px' }} disabled={savingName} onClick={saveName}>{savingName ? '儲存中…' : '儲存'}</button>
-        </div>
-      </div>
-
-      <div className="card">
-        <b>課程名稱</b>
-        <div className="rng">
-          <input className="tin" placeholder="例如：皮拉提斯" value={courseNameInput}
-            onChange={e => { setCourseNameInput(e.target.value); setNotice(''); }}
-            onKeyDown={e => { if (e.key === 'Enter') saveCourseName(); }} />
-          <button className="btn" style={{ flex: '0 0 auto', padding: '0 18px' }} disabled={savingCourseName} onClick={saveCourseName}>{savingCourseName ? '儲存中…' : '儲存'}</button>
-        </div>
-      </div>
-
-      <div className="card">
-        <b>選課規則與時間說明</b>
-        <p className="hint">學生端「選課規則與時間說明」裡的內容，整段自己寫，留空就會用預設的四條規則。</p>
-        <textarea className="tin" style={{ minHeight: 100, padding: 8 }}
-          placeholder={defaultCourseRuleLines(realSession.name).map(l => `• ${l}`).join('\n')}
-          value={courseRulesInput}
-          onChange={e => { setCourseRulesInput(e.target.value); setNotice(''); }} />
-        <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={savingCourseRules} onClick={saveCourseRules}>{savingCourseRules ? '儲存中…' : '儲存'}</button>
-      </div>
-
-      <div className="card">
-        <b>上班時段通知文字</b>
-        <p className="hint">中間實際上班時間、固定會議時間、邀請連結是自動算出來的，不能改；這裡只能加開頭的問候語、結尾的補充說明，留空就不會加。</p>
-        <p className="m" style={{ marginBottom: 2 }}>開頭</p>
-        <textarea className="tin" style={{ minHeight: 60, padding: 8 }} placeholder="例如：各位同學好 🌸"
-          value={hoursPrefixInput}
-          onChange={e => { setHoursPrefixInput(e.target.value); setNotice(''); }} />
-        <p className="m" style={{ margin: '8px 0 2px' }}>結尾</p>
-        <textarea className="tin" style={{ minHeight: 60, padding: 8 }} placeholder="例如：有問題歡迎直接回覆我"
-          value={hoursSuffixInput}
-          onChange={e => { setHoursSuffixInput(e.target.value); setNotice(''); }} />
-        <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={savingHoursTemplate} onClick={saveHoursTemplate}>{savingHoursTemplate ? '儲存中…' : '儲存'}</button>
-      </div>
-
       <div className="card">
         <b>邀請學生的專屬連結</b>
         <p className="hint">把這個連結傳給你的學生，他們點進來第一次會先填名字加入——只會加進你的名單，不會跟其他老師的學生混在一起。</p>
@@ -189,8 +228,6 @@ export default function ManageTeachersPage() {
 
       <a className="btn outline" href="/api/auth/line/logout" style={{ width: '100%' }}>登出</a>
     </>) : (<>
-      <p className="hint">新老師不用等別人加，自己點下面的連結、填名字就能加入並建立自己的資料；這頁主要是給你看目前有誰、或要移除不用了的老師。這套是展示模式用的，正式老師請改用 LINE 登入。</p>
-
       <div className="card">
         <b>給新老師的加入連結</b>
         <p className="hint">傳給新同事，她自己點連結、填名字，就會建立專屬自己的學生名單、上班時間和課表。</p>

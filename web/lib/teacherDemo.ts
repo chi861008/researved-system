@@ -151,10 +151,13 @@ function writeDeletedTeacherIds(ids: string[]) {
   window.localStorage.setItem(DELETED_TEACHERS_STORAGE_KEY, JSON.stringify(ids));
 }
 
-/** 固定的示範老師 + 後來新增的老師，扣掉刪除過的，合併成完整名單（老師端切換、學生端驗證邀請連結都要用這份） */
+/** 固定的示範老師 + 後來新增的老師，扣掉刪除過的，合併成完整名單（老師端切換、學生端驗證邀請連結都要用這份）；
+ * 名字如果在「老師管理」頁改過，這裡要套用覆蓋值，不然到處顯示的還是原本的 Joanna/Coco。 */
 export function getAllTeachers(): DemoTeacher[] {
   const deleted = new Set(readDeletedTeacherIds());
-  return [...DEMO_TEACHERS, ...readAddedTeachers()].filter(t => !deleted.has(t.id));
+  return [...DEMO_TEACHERS, ...readAddedTeachers()]
+    .filter(t => !deleted.has(t.id))
+    .map(t => { const nm = getDemoTeacherSettings(t.id).name?.trim(); return nm ? { ...t, name: nm } : t; });
 }
 
 /** 新增一位老師，回傳新老師的資料（管理頁用：手動幫同事加一筆） */
@@ -209,6 +212,28 @@ export function getDemoStudentPattern(teacherId: string, studentId: string): Wee
 export function saveDemoStudentPattern(teacherId: string, studentId: string, pattern: WeeklyPattern) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(STUDENT_PATTERN_KEY_PREFIX + teacherId + '|' + studentId, JSON.stringify(pattern));
+}
+
+// ---------- 展示用「可自訂的老師設定」：我的名字／課程名稱／選課規則／上班時段通知文字 ----------
+// 呼應真老師那邊 teachers 表的對應欄位，一樣存 localStorage，讓「老師管理」頁的展示模式也能示範
+// 這幾個設定，不是只有接了資料庫的真老師才看得到新版介面。
+export interface DemoTeacherSettings {
+  name?: string;
+  courseName?: string;
+  courseRules?: string;
+  hoursPrefix?: string;
+  hoursSuffix?: string;
+}
+const TEACHER_SETTINGS_STORAGE_PREFIX = 'pilates-demo-teacher-settings-';
+export { TEACHER_SETTINGS_STORAGE_PREFIX };
+
+export function getDemoTeacherSettings(teacherId: string): DemoTeacherSettings {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(window.localStorage.getItem(TEACHER_SETTINGS_STORAGE_PREFIX + teacherId) || '{}'); } catch { return {}; }
+}
+export function saveDemoTeacherSettings(teacherId: string, patch: DemoTeacherSettings) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(TEACHER_SETTINGS_STORAGE_PREFIX + teacherId, JSON.stringify({ ...getDemoTeacherSettings(teacherId), ...patch }));
 }
 
 export { datesBetween };
