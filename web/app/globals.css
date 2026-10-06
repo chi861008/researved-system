@@ -1,6 +1,6 @@
-/* 暖陶橘：純白底＋飽和陶土橘重點色。底色直接用白色，層次不靠背景上色，改靠邊框／陰影／
-   soft 強調色塊來區分「這是一塊獨立的卡片／這是重點內容」。 */
-:root { --bg:#ffffff; --ink:#2e2722; --muted:#7d6f5c; --line:#ece2cf; --on:#d9622f; --on-ink:#fff; --warn:#b2501f; --card:#fffdf8; --soft:#fbe3d4; }
+/* 暖陶橘：淺灰底＋純白卡片＋飽和陶土橘重點色。參考的範例圖都是「淺灰色畫布＋白色卡片浮在上面」
+   這種組合，灰／白的明度差本身就夠分層，不用再靠背景上色或強陰影來撐對比。 */
+:root { --bg:#f0eee9; --ink:#2e2722; --muted:#7d6f5c; --line:#e7e3da; --on:#d9622f; --on-ink:#fff; --warn:#b2501f; --card:#ffffff; --soft:#fbe3d4; }
 @media (prefers-color-scheme: dark) { :root { --bg:#241d16; --ink:#ede6db; --muted:#b7a890; --line:#4d3f2e; --on:#e8763f; --on-ink:#241206; --warn:#f0a36f; --card:#352b1f; --soft:#3d2a1c; } }
 * { box-sizing: border-box; }
 html, body { margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif; line-height:1.6; }
@@ -16,7 +16,7 @@ main { max-width:560px; margin:0 auto; padding:calc(16px + env(safe-area-inset-t
 h1 { font-size:1.4rem; margin:0 0 4px; }
 .sub, .hint, .m { color:var(--muted); font-size:.9rem; margin:2px 0 8px; }
 .warn { color:var(--warn); }
-.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; box-shadow:0 2px 8px rgba(46,39,34,.08); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; box-shadow:0 1px 4px rgba(46,39,34,.05); }
 .card ul { margin:6px 0 0; padding-left:18px; font-size:.9rem; }
 /* 卡片標題跟內文字級太接近，只靠粗體撐不出層次；標題統一拉大一點、跟內容隔開一點距離。 */
 .card > b:first-child { display:block; font-size:1.08rem; margin-bottom:4px; }
