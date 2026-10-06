@@ -83,6 +83,10 @@ export default function Page() {
 
   useEffect(() => { // 在 LINE 內開啟時自動登入，取得學生身分
     if (!liffId) return;
+    // 展示模式的連結（?t=demo-id）就算直接在一般瀏覽器打開也不該跑 LIFF 流程，不然會被導去
+    // 真的 LINE 登入頁面，展示模式就沒辦法直接在瀏覽器裡測試／展示給別人看了。
+    const qsT = new URLSearchParams(window.location.search).get('t');
+    if (qsT && getAllTeachers().some(x => x.id === qsT)) { setLiffReady(true); return; }
     (async () => {
       try {
         const liff = (await import('@line/liff')).default;
