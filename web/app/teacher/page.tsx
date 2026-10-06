@@ -902,9 +902,6 @@ export default function TeacherPage() {
             )}
 
             <button className="btn pri" style={{ width: '100%', marginTop: 10 }} disabled={!allFilled || scheduling} onClick={runAutoSchedule}>{scheduling ? '排課中…' : '自動排課'}</button>
-            {!hasExistingSchedule && (
-              <p className="hint">{allFilled ? '只排' + currentTeacherName + '；學生有空但排不進去的列在「待補其他老師」，整週沒有可上課時段則順延，後續週照常安排。' : '全部學生都填寫完才能排課，避免排到一半又要重排。'}</p>
-            )}
           </div></div>
 
           {/* ---- 確認課表：排課結果、待補、順延、重新排課／確認課表 ---- */}
@@ -970,7 +967,6 @@ export default function TeacherPage() {
             period.status !== 'approved' && period.status !== 'notified' ? (
               <p className="hint">確認課表後，這裡會列出每位學生的通知文字。</p>
             ) : (<>
-              <p className="hint">每位學生會在 LINE 收到自己的課表，不會傳到群組。</p>
               {students.map(s => {
                 const ls = period.lessons.filter(l => l.studentId === s.id);
                 const n = needsTeacher.filter(u => u.studentId === s.id).length;
@@ -987,7 +983,6 @@ export default function TeacherPage() {
                 );
               })}
               <button className="btn outline" style={{ width: '100%' }} onClick={requestReschedule}>重新排課</button>
-              <p className="hint">每張卡片都能先編輯文字再複製，自己貼到 LINE 傳給學生——不會占用官方帳號每月的訊息則數。</p>
               {period.log.filter(x => x.kind !== 'remind').length > 0 && (<>
                 <div className="sec" style={{ fontWeight: 700, margin: '18px 0 2px' }}>之後自動發送的訊息</div>
                 {period.log.filter(x => x.kind !== 'remind').map((x, i) => (

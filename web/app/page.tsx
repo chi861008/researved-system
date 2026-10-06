@@ -131,10 +131,17 @@ export default function Page() {
       if (!res.ok) throw new Error(j.error || '送出失敗');
       // 展示模式沒有真的資料庫，「記住」要自己存進 localStorage；真老師模式由伺服器直接存進 students 表。
       if (j.demo && rememberPattern) saveDemoStudentPattern(resolved.id, joined.id, deriveWeeklyPattern(sel, dates, P.starts));
-      setStatus({ t: 'ok', m: j.demo ? '展示模式：已模擬送出（尚未寫入資料庫）。' : '已送出！排好後會用 LINE 個別通知你上課日期、時間及授課老師。' });
+      setStatus({ t: 'ok', m: (j.demo ? '展示模式：已模擬送出（尚未寫入資料庫）。' : '已送出！排好後會用 LINE 個別通知你上課日期、時間及授課老師。') + '要修改請按「編輯時段」。' });
       setLocked(true);
     } catch (e) { setStatus({ t: 'err', m: (e as Error).message + '，請稍後再試。' }); }
   }
+
+  // 送出結果的提醒改成浮動 toast，出現一次、幾秒後自動消失，不要一直黏在畫面上。
+  useEffect(() => {
+    if (!status.m) return;
+    const timer = setTimeout(() => setStatus(s => ({ ...s, m: undefined })), 4000);
+    return () => clearTimeout(timer);
+  }, [status.m]);
 
   const needLogin = !!liffId && !idToken;
 
@@ -175,11 +182,7 @@ export default function Page() {
       )}
     </details>
 
-    {locked && (
-      <p className="toast" role="status">
-        ✅ 已送出，上面的選擇先保留不會變動。要修改的話請先按「編輯」。
-      </p>
-    )}
+    {status.m && <p className={'toast-overlay' + (status.t === 'err' ? ' err' : '')} role="status">{status.m}</p>}
 
     <CollapsibleSlotGrid
       key={String(locked)}
@@ -245,7 +248,6 @@ export default function Page() {
         <button className="send" disabled={!sel.size || needLogin || status.t === 'busy'} onClick={submit}>
           {status.t === 'busy' ? '送出中…' : `送出 ${sel.size} 個可上課時段`}
         </button>
-        {status.m && <p className={'msg' + (status.t === 'err' ? ' err' : '')} role="status">{status.m}</p>}
       </div></div>
     )}
   </main>);

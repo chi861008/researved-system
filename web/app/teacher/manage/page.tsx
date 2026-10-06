@@ -130,12 +130,8 @@ export default function ManageTeachersPage() {
     {notice && <p className="toast" role="status">{notice}</p>}
 
     {realSession ? (<>
-      <p className="m" style={{ margin: 0 }}>登入中：{realSession.name}</p>
-      <p className="hint">你是用 LINE 登入的正式老師帳號，只會看到自己的資料，不會看到其他老師。</p>
-
       <div className="card">
         <b>我的名字</b>
-        <p className="hint">會用在學生看到的文字裡（例如「XX 不上班的時段」「授課老師：XX」），也是妳登入後畫面上顯示的名字。</p>
         <div className="rng">
           <input className="tin" placeholder="例如：Joanna" value={nameInput}
             onChange={e => { setNameInput(e.target.value); setNotice(''); }}
@@ -146,7 +142,6 @@ export default function ManageTeachersPage() {
 
       <div className="card">
         <b>課程名稱</b>
-        <p className="hint">會用在學生看到的文字裡，例如「OOO 的 ＯＯ課程」「X 月 ＯＯ選課開始囉」，預設是「皮拉提斯」。</p>
         <div className="rng">
           <input className="tin" placeholder="例如：皮拉提斯" value={courseNameInput}
             onChange={e => { setCourseNameInput(e.target.value); setNotice(''); }}
@@ -188,7 +183,6 @@ export default function ManageTeachersPage() {
 
       <div className="card">
         <b>邀請新老師</b>
-        <p className="hint">把這個連結傳給新老師，她打開後點「用 LINE 登入」；登入後畫面會顯示一組代碼，請她把代碼給你，你再到後台的老師名單幫她加一筆，她之後就能用自己的 LINE 帳號登入、只看到自己的資料。</p>
         {origin ? <div className="msg">{`${origin}/teacher`}</div> : <p className="m">網址準備中…</p>}
         {origin && <CopyBtn text={`${origin}/teacher`} />}
       </div>

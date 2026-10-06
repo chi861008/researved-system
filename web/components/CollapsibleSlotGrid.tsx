@@ -39,7 +39,7 @@ export default function CollapsibleSlotGrid({
       <div className="m" style={{ margin: '4px 0 10px', whiteSpace: 'pre-wrap' }}>{summaryText}</div>
       <div className="row">
         <button className="btn outline" style={{ width: '100%' }} onClick={() => setExpanded(true)}>
-          {gridProps.readOnly ? '查看時段' : '編輯時段'}
+          {gridProps.readOnly ? '已送出／編輯時段' : '編輯時段'}
         </button>
         {collapsedActions}
       </div>
