@@ -3,14 +3,17 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { rowsToSlotSet } from '@/lib/supabaseSlots';
 import { ymFrom, ymEnd, STUDIO_STARTS, LESSON_MINUTES } from '@/lib/ym';
 
-// 公開端點：學生端用來拿「這位老師目前開放選課的月份」——同一時間最多只會有一個月是 collecting
-// （在 confirm-hours 那支 API 裡擋住，見那邊的註解），沒有就代表目前沒開放。
-export async function GET(_req: Request, { params }: { params: Promise<{ teacherId: string }> }) {
+// 公開端點：學生端用來拿「這位老師開放選課的月份」。邀請連結現在會帶 ?ym=，直接查那一個月；
+// 沒帶（舊格式、之前已經分享出去的連結）才退回舊行為——挑這位老師目前唯一 collecting 的月份
+// （現在可以同時有好幾個月在收集中，舊連結只能猜到其中一個，這是刻意的向下相容妥協）。
+export async function GET(req: Request, { params }: { params: Promise<{ teacherId: string }> }) {
   const { teacherId } = await params;
+  const ym = new URL(req.url).searchParams.get('ym');
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
 
-  const { data: period } = await supabase.from('periods').select('ym').eq('teacher_id', teacherId).eq('status', 'collecting').maybeSingle();
+  const query = supabase.from('periods').select('ym').eq('teacher_id', teacherId).eq('status', 'collecting');
+  const { data: period } = ym ? await query.eq('ym', ym).maybeSingle() : await query.maybeSingle();
   if (!period) return NextResponse.json({ noOpenPeriod: true });
 
   const [{ data: blockRow }, { data: slotRows }] = await Promise.all([

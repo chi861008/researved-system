@@ -8,10 +8,9 @@ import { ymFrom, ymEnd, STUDIO_STARTS } from '@/lib/ym';
 
 const today = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 
-// 「完成選取／開放選課」：如果這個月還沒開放過，這是第一次把它寫進 periods（直接是 collecting）；
-// 已經開放過的月份再按，單純更新上班時段，不會動到狀態。同時間只能有一個月在「收集中」——
-// 老師要先把上一個月排完（進 draft）或核准，才能開下一個月，這裡擋住，不然學生的單一邀請連結
-// 不知道該顯示哪個月。
+// 存上班時段，不負責「開放這個月給學生」——那是獨立的開關，見 app/api/teacher/periods/[ym]/open/route.ts。
+// 這支第一次存某個月的時段時，如果這個月的 periods row 還不存在，會先建一筆 status='closed'（學生還
+// 看不到），之後老師另外去按開關才會變成 'collecting'。不會因為存時段就自動開放，兩件事分開。
 export async function POST(req: Request, { params }: { params: Promise<{ ym: string }> }) {
   const { ym } = await params;
   const session = await getTeacherSession();
@@ -26,9 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ym: str
 
   const { data: existing } = await supabase.from('periods').select('id,status').eq('teacher_id', session.id).eq('ym', ym).maybeSingle();
   if (!existing) {
-    const { data: otherOpen } = await supabase.from('periods').select('ym').eq('teacher_id', session.id).eq('status', 'collecting').neq('ym', ym).maybeSingle();
-    if (otherOpen) return NextResponse.json({ error: `${otherOpen.ym} 還在收集中，請先完成排課並核准後再開放這個月。` }, { status: 409 });
-    const { error: insErr } = await supabase.from('periods').insert({ teacher_id: session.id, ym, status: 'collecting' });
+    const { error: insErr } = await supabase.from('periods').insert({ teacher_id: session.id, ym, status: 'closed' });
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
@@ -39,5 +36,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ ym: str
     const pattern = deriveWeeklyPattern(new Set(keys), datesBetween(ymFrom(ym), ymEnd(ym)), STUDIO_STARTS);
     await supabase.from('teachers').update({ weekly_pattern: pattern }).eq('id', session.id);
   }
-  return NextResponse.json({ ok: true, opened: !existing });
+  return NextResponse.json({ ok: true, status: existing?.status ?? 'closed' });
 }

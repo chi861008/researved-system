@@ -28,7 +28,9 @@ const WD = '日一二三四五六';
 // 月份旁邊那顆狀態小標籤：draft／approved／notified 對學生來說都是「已經排好、不能再編輯」，
 // 不需要細分成三種文字；收集中則帶上目前幾位已填寫／總共幾位，一眼看出進度。
 function periodPillLabel(status: PeriodState['status'], filledCount: number, totalStudents: number): string {
-  if (status === 'upcoming') return '尚未開放';
+  // upcoming（還沒建過 row）跟 closed（row 在了、開關沒開）對學生來說是同一件事：還看不到、不能填，
+  // 不需要在這顆標籤上特別分開講，開關本身的狀態已經夠清楚了。
+  if (status === 'upcoming' || status === 'closed') return '尚未開放';
   if (status === 'collecting') return `收集中（${filledCount}/${totalStudents}）`;
   return '完成排課不開放';
 }
@@ -41,7 +43,9 @@ const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 interface Lesson { id: number | string; studentId: string; date: string; start: number; teacherName?: string; checkedInAt?: string }
 interface UnassignedUI { id?: string; studentId: string; weekStart: string; reason: UnassignedReason; windows: string[] }
 interface LogEntry { kind: 'notify' | 'remind'; time: string; studentId: string; text: string }
-interface PeriodState { status: 'upcoming' | 'collecting' | 'draft' | 'approved' | 'notified'; lessons: Lesson[]; unassigned: UnassignedUI[]; notified: boolean; log: LogEntry[] }
+// 'upcoming'：還沒建過這個月的 row（純前端狀態，不會寫進資料庫）。'closed'：row 已經存在（可能已經
+// 存過上班時段），但「開放給學生填」這個開關還沒打開——對應真資料庫 periods.status 新增的那個值。
+interface PeriodState { status: 'upcoming' | 'closed' | 'collecting' | 'draft' | 'approved' | 'notified'; lessons: Lesson[]; unassigned: UnassignedUI[]; notified: boolean; log: LogEntry[] }
 
 // 每位老師自己的資料：學生、上班時間、固定會議時間、每月排課週期……彼此完全分開，用 teacherId 當 key。
 interface TeacherState {
@@ -383,7 +387,10 @@ export default function TeacherPage() {
     return () => window.removeEventListener('storage', onStorage);
   }, [currentTeacherId, realSession]);
 
-  const inviteLink = STUDENT_LIFF_BASE ? `${STUDENT_LIFF_BASE}?t=${currentTeacherId}` : (origin ? `${origin}/?t=${currentTeacherId}` : '');
+  // 連結帶上 &ym=，學生端才知道這個連結是哪個月的，不用再靠「猜唯一收集中的月份」
+  // （現在可以同時好幾個月都在收集中，真老師模式才需要帶，展示模式維持原本不帶月份的格式）。
+  const inviteLink = STUDENT_LIFF_BASE ? `${STUDENT_LIFF_BASE}?t=${currentTeacherId}${realSession ? `&ym=${curYm}` : ''}`
+    : (origin ? `${origin}/?t=${currentTeacherId}${realSession ? `&ym=${curYm}` : ''}` : '');
 
   const studentName = (id: string) => students.find(s => s.id === id)?.name ?? id;
   const isBlocked = (d: string, s: number) => weekday(d) === weeklyBlock.weekday && s >= weeklyBlock.start && s < weeklyBlock.end;
@@ -516,8 +523,8 @@ export default function TeacherPage() {
     }
   }
 
-  // 編輯時段頁最下面「完成選取／開放選課」：如果這個月還沒開放，順便把它轉成「收集中」，
-  // 這就是開放選課的那一刻；已經開放過的月份再按，單純只是收合編輯頁，不會動到狀態。
+  // 編輯時段頁最下面「完成選取」：真老師模式下，這個按鈕只負責存時段，不再負責開放——開放是獨立的
+  // 開關（見 openPeriod()）。展示模式維持原本的行為不變（存時段第一次順便開放），範圍只收真老師。
   async function confirmHours() {
     if (realSession) {
       const res = await fetch(`/api/teacher/periods/${curYm}/confirm-hours`, {
@@ -528,22 +535,48 @@ export default function TeacherPage() {
         }),
       });
       if (!res.ok) { const data = await res.json().catch(() => ({})); setNotice(data?.error || '更新失敗，請稍後再試。'); return; }
+      const data = await res.json().catch(() => ({}));
       if (rememberHours) setTeacherPattern(deriveWeeklyPattern(teacherAvailability, dates, STARTS));
-    } else if (rememberHours) {
-      saveDemoTeacherPattern(currentTeacherId, deriveWeeklyPattern(teacherAvailability, dates, STARTS));
-    }
-    if (period.status === 'upcoming') {
-      updatePeriod(curYm, { status: 'collecting' });
-      syncDemoPeriodStatus(curYm, 'collecting');
-      setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
-      setHoursPopupKind('opened');
-    } else {
+      // 狀態一律用 API 實際回傳的值更新：'upcoming' 第一次存會變成 'closed'，已經是 closed／
+      // collecting 的月份維持原狀，不會因為單純存時段就被改去 'collecting'。
+      if (data.status) updatePeriod(curYm, { status: data.status });
       setNotice(`已更新 ${+curYm.slice(5)} 月的上班時段。`);
       setHoursPopupKind('updated');
+    } else {
+      if (rememberHours) saveDemoTeacherPattern(currentTeacherId, deriveWeeklyPattern(teacherAvailability, dates, STARTS));
+      if (period.status === 'upcoming') {
+        updatePeriod(curYm, { status: 'collecting' });
+        syncDemoPeriodStatus(curYm, 'collecting');
+        setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
+        setHoursPopupKind('opened');
+      } else {
+        setNotice(`已更新 ${+curYm.slice(5)} 月的上班時段。`);
+        setHoursPopupKind('updated');
+      }
     }
-    // 不管是第一次開放，還是之後編輯已經開放的月份，每次存完都用彈窗強調「記得把最新的通知文字傳給學生」，
+    // 不管是哪種情況，每次存完都用彈窗強調「記得把最新的通知文字傳給學生」，
     // 不要只是安靜地放在畫面下方等她自己捲下去看到。
     setShowHoursPopup(true);
+  }
+
+  // 「開放／關閉這個月收集時段」的開關：真老師模式才有，展示模式的月份一律維持現在的行為
+  // （FIRST_YM 固定一開始就是收集中，不需要另外開關）。只能在排課之前切換，已經排過課的月份
+  // 這顆開關會被停用，要重開走既有的「重新排課」。
+  async function openPeriod(open: boolean) {
+    if (!realSession) return;
+    const res = await fetch(`/api/teacher/periods/${curYm}/open`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ open }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setNotice(data?.error || '操作失敗，請稍後再試。'); return; }
+    updatePeriod(curYm, { status: data.status });
+    if (open) {
+      setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
+      setHoursPopupKind('opened');
+      setShowHoursPopup(true);
+    } else {
+      setNotice(`已關閉 ${+curYm.slice(5)} 月的收集，學生暫時看不到這個月的選課畫面。`);
+    }
   }
 
   // ---------- 學生 ----------
@@ -833,6 +866,19 @@ export default function TeacherPage() {
           setCurYm(ymKeys[ymKeys.indexOf(curYm) + 1]);
         }}>›</button>
     </div>
+
+    {/* ---- 開放／關閉這個月收集時段的開關：只有真老師模式有、而且只能在還沒排課前切換 ----
+         （展示模式的 FIRST_YM 固定一開始就是收集中，不需要這顆；已排課的月份要重開走「重新排課」）。 */}
+    {realSession && (
+      <div className="card remember-row" style={{ marginBottom: 12 }}>
+        {period.status === 'closed' || period.status === 'collecting' || period.status === 'upcoming' ? (<>
+          <input type="checkbox" id="openPeriodChk" checked={period.status === 'collecting'} onChange={e => openPeriod(e.target.checked)} />
+          <label htmlFor="openPeriodChk">開放這個月收集時段</label>
+        </>) : (
+          <p className="hint" style={{ margin: 0 }}>這個月已經排課了，要重新開放請用下面的「重新排課」。</p>
+        )}
+      </div>
+    )}
 
     {/* ---- 代填模式 ---- */}
     {activeStudent ? (

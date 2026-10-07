@@ -1,15 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import CopyBtn from '@/components/CopyBtn';
 import { getAllTeachers, getMyTeacherId, MAIN_TEACHER_ID, getDemoTeacherSettings, saveDemoTeacherSettings } from '@/lib/teacherDemo';
 import { defaultCourseRuleLines } from '@/lib/courseDefaults';
 
-const STUDENT_LIFF_BASE = process.env.NEXT_PUBLIC_LIFF_ID ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}` : '';
-
 export default function ManageTeachersPage() {
   const [notice, setNotice] = useState('');
-  const [origin, setOrigin] = useState('');
   // 有沒有用真的 LINE 登入，決定下面幾張設定卡片存進哪裡（Supabase 或 localStorage）、
   // 以及「邀請學生連結／邀請新老師／登出」這幾張只有真老師才有意義的卡片要不要顯示。
   const [realSession, setRealSession] = useState<{ id: string; name: string } | null>(null);
@@ -30,7 +26,6 @@ export default function ManageTeachersPage() {
 
   useEffect(() => {
     const allTeachers = getAllTeachers();
-    setOrigin(window.location.origin);
     (async () => {
       // 一支 /api/teacher/state 就同時拿到 id/name 跟課程名稱／規則／通知文字設定，不用先問
       // session 再問 state 兩趟，縮短「展示模式畫面」閃現的時間。
@@ -122,10 +117,6 @@ export default function ManageTeachersPage() {
     } finally { setSavingHoursTemplate(false); }
   }
 
-  const studentInviteLink = realSession
-    ? (STUDENT_LIFF_BASE ? `${STUDENT_LIFF_BASE}?t=${realSession.id}` : (origin ? `${origin}/?t=${realSession.id}` : ''))
-    : '';
-
   if (!authChecked) return <main />;
 
   return (<main style={{ paddingBottom: 100 }}>
@@ -181,19 +172,15 @@ export default function ManageTeachersPage() {
       <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={savingHoursTemplate} onClick={saveHoursTemplate}>{savingHoursTemplate ? '儲存中…' : '儲存'}</button>
     </div>
 
-    {realSession && (<>
-      <div className="card">
-        <b>邀請學生的專屬連結</b>
-        <p className="hint">把這個連結傳給你的學生，他們點進來第一次會先填名字加入——只會加進你的名單，不會跟其他老師的學生混在一起。</p>
-        {studentInviteLink ? <div className="msg">{studentInviteLink}</div> : <p className="m">網址準備中…</p>}
-        {studentInviteLink && <CopyBtn text={studentInviteLink} />}
-      </div>
-
-      {/* 「邀請新老師」先拿掉：這個連結點了只是去登入頁，沒有白名單的 LINE 帳號登入會直接被擋下，
-          連結本身不會自動幫對方開通——新增老師目前還是要先拿到對方的 LINE 代碼，手動加進 teachers 表。 */}
-
+    {/* 「邀請學生的專屬連結」拿掉了：連結現在一定要帶月份（?ym=）才有意義，這頁不知道「現在是哪個
+        月」（那是 /teacher 主頁 curYm 的狀態），而且同時可能有好幾個月都在收集中，沒有唯一一個「現在
+        這個」可以代表。邀請連結維持現在真正在用的管道：老師頁「上班時段」卡片裡的訊息文字，本來就
+        帶正確月份的連結。 */}
+    {/* 「邀請新老師」也拿掉：這個連結點了只是去登入頁，沒有白名單的 LINE 帳號登入會直接被擋下，
+        連結本身不會自動幫對方開通——新增老師目前還是要先拿到對方的 LINE 代碼，手動加進 teachers 表。 */}
+    {realSession && (
       <a className="btn outline" href="/api/auth/line/logout" style={{ width: '100%' }}>登出</a>
-    </>)}
+    )}
 
     {/* ---- 底部分頁列，跟老師頁共用同一個樣式，直接切換不用先按返回 ---- */}
     <div className="bar" style={{ padding: '0 0 env(safe-area-inset-bottom,0px)' }}>

@@ -110,10 +110,14 @@ export default function Page() {
     })();
   }, [liffId]);
 
-  // 真老師模式：確認是真的老師之後，問她目前開放選課的是哪個月（同一時間最多一個月在收集中）。
+  // 真老師模式：確認是真的老師之後，問她這個連結指定的是哪個月（?ym=，邀請連結現在會帶這個參數，
+  // 同時可能有好幾個月都在收集中，不能再用「猜唯一一個收集中的月份」那套；沒帶 ym 的舊連結才讓
+  // 後端自己退回舊行為）。
   useEffect(() => {
     if (!resolved?.isReal) return;
-    fetch(`/api/teachers/${resolved.id}/period`).then(r => r.json()).then(data => {
+    const ym = new URLSearchParams(window.location.search).get('ym');
+    const url = ym ? `/api/teachers/${resolved.id}/period?ym=${ym}` : `/api/teachers/${resolved.id}/period`;
+    fetch(url).then(r => r.json()).then(data => {
       if (data.noOpenPeriod) { setNoOpenPeriod(true); return; }
       setRealPeriod({ ym: data.ym, from: data.from, to: data.to, starts: data.starts, lessonMinutes: data.lessonMinutes, weeklyBlocks: data.weeklyBlocks });
       setRealTeacherAvailability(new Set<string>(data.teacherAvailability));

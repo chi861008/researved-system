@@ -15,10 +15,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
   const { data: period } = await supabase.from('periods').select('id').eq('teacher_id', session.id).eq('ym', ym).maybeSingle();
   if (!period) return NextResponse.json({ error: '這個月還沒開放選課' }, { status: 404 });
 
-  // 同時間只能有一個月「收集中」，退回去之前先確認沒有別的月份已經是收集中。
-  const { data: otherOpen } = await supabase.from('periods').select('ym').eq('teacher_id', session.id).eq('status', 'collecting').neq('ym', ym).maybeSingle();
-  if (otherOpen) return NextResponse.json({ error: `${otherOpen.ym} 目前是收集中，請先處理完那個月再清除這個月的課表。` }, { status: 409 });
-
   await supabase.from('lessons').delete().eq('period_id', period.id);
   await supabase.from('unassigned').delete().eq('period_id', period.id);
   const { error } = await supabase.from('periods').update({ status: 'collecting' }).eq('id', period.id);
