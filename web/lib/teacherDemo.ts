@@ -236,4 +236,20 @@ export function saveDemoTeacherSettings(teacherId: string, patch: DemoTeacherSet
   window.localStorage.setItem(TEACHER_SETTINGS_STORAGE_PREFIX + teacherId, JSON.stringify({ ...getDemoTeacherSettings(teacherId), ...patch }));
 }
 
+// ---------- 展示用「這個月還能不能編輯」----------
+// 學生能不能編輯要看老師那個月的狀態（收集中才能），但老師端的 periods 狀態只存在 /teacher 頁的
+// React 記憶體裡，學生頁是完全獨立的另一個元件，看不到——所以額外存一份「鎖住了沒」到 localStorage。
+// 只分兩種：collecting（學生可以編輯）／locked（已經排課，draft／approved／notified 都算，不能再編輯）。
+export type DemoPeriodStatus = 'collecting' | 'locked';
+export const PERIOD_STATUS_STORAGE_PREFIX = 'pilates-demo-period-status-';
+
+export function getDemoPeriodStatus(teacherId: string, ym: string): DemoPeriodStatus {
+  if (typeof window === 'undefined') return 'collecting';
+  return window.localStorage.getItem(PERIOD_STATUS_STORAGE_PREFIX + teacherId + '|' + ym) === 'locked' ? 'locked' : 'collecting';
+}
+export function saveDemoPeriodStatus(teacherId: string, ym: string, status: DemoPeriodStatus) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(PERIOD_STATUS_STORAGE_PREFIX + teacherId + '|' + ym, status);
+}
+
 export { datesBetween };

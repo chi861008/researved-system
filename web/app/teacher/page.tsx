@@ -9,7 +9,7 @@ import {
   DEMO_TEACHERS, DEMO_STUDENTS_BY_TEACHER, seedDemoAvailability, seedTeacherAvailability,
   getJoinedStudents, JOINED_STORAGE_KEY, getAllTeachers, ADDED_TEACHERS_STORAGE_KEY, DELETED_TEACHERS_STORAGE_KEY,
   getMyTeacherId, getDemoTeacherPattern, saveDemoTeacherPattern, getDemoSubmittedAvailability, SUBMITTED_AVAIL_STORAGE_PREFIX,
-  getDemoTeacherSettings, TEACHER_SETTINGS_STORAGE_PREFIX,
+  getDemoTeacherSettings, TEACHER_SETTINGS_STORAGE_PREFIX, saveDemoPeriodStatus,
   type DemoStudent, type DemoTeacher,
 } from '@/lib/teacherDemo';
 import {
@@ -25,7 +25,13 @@ const STARTS = STUDIO_STARTS;
 const STUDENT_LIFF_BASE = process.env.NEXT_PUBLIC_LIFF_ID ? `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}` : '';
 const L = LESSON_MINUTES;
 const WD = '日一二三四五六';
-const STATUS_LABEL: Record<string, string> = { upcoming: '尚未開放', collecting: '收集中', draft: '課表待確認', approved: '已核准', notified: '已通知' };
+// 月份旁邊那顆狀態小標籤：draft／approved／notified 對學生來說都是「已經排好、不能再編輯」，
+// 不需要細分成三種文字；收集中則帶上目前幾位已填寫／總共幾位，一眼看出進度。
+function periodPillLabel(status: PeriodState['status'], filledCount: number, totalStudents: number): string {
+  if (status === 'upcoming') return '尚未開放';
+  if (status === 'collecting') return `收集中（${filledCount}/${totalStudents}）`;
+  return '完成排課不開放';
+}
 
 const isBlockedGlobal = (d: string, s: number) => weekday(d) === 3 && s >= parseHM('16:00') && s < parseHM('17:00');
 // 台灣日期（UTC+8）
@@ -437,6 +443,14 @@ export default function TeacherPage() {
 
   const updatePeriod = (ym: string, patch: Partial<PeriodState>) => setPeriods(p => ({ ...p, [ym]: { ...p[ym], ...patch } }));
 
+  // 展示模式：這個月變成「收集中」還是「已經排課、不能再編輯」，額外存一份到 localStorage，
+  // 學生頁（完全獨立的另一個元件／分頁）才看得到，不然學生永遠不會被鎖住。真老師模式由資料庫的
+  // periods.status 把關，不需要這份。
+  function syncDemoPeriodStatus(ym: string, status: PeriodState['status']) {
+    if (realSession) return;
+    saveDemoPeriodStatus(currentTeacherId, ym, status === 'upcoming' || status === 'collecting' ? 'collecting' : 'locked');
+  }
+
   const monthCount = (sel: Set<string>) => [...sel].filter(k => k.startsWith(curYm)).length;
   const filled = (st: DemoStudent) => [...(studentAvailability.get(st.id) ?? [])].some(k => k.startsWith(curYm));
 
@@ -510,6 +524,7 @@ export default function TeacherPage() {
     }
     if (period.status === 'upcoming') {
       updatePeriod(curYm, { status: 'collecting' });
+      syncDemoPeriodStatus(curYm, 'collecting');
       setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
       setHoursPopupKind('opened');
     } else {
@@ -617,6 +632,7 @@ export default function TeacherPage() {
         }
       }
       updatePeriod(curYm, { lessons: [], unassigned: [], status: 'collecting', notified: false });
+      syncDemoPeriodStatus(curYm, 'collecting');
       setNotice('已清除課表，恢復成收集中。調整好學生名單或上班時段後，再按「自動排課」重新排一次。');
       setRescheduleConfirmOpen(false);
       gotoSection('schedule');
@@ -642,6 +658,7 @@ export default function TeacherPage() {
     let uid = 1;
     const newLessons: Lesson[] = res.lessons.map(l => ({ id: uid++, studentId: l.studentId, date: l.date, start: l.start }));
     updatePeriod(curYm, { lessons: newLessons, unassigned: res.unassigned, status: 'draft', notified: false });
+    syncDemoPeriodStatus(curYm, 'draft');
     setNotice('');
     return true;
   }
@@ -655,6 +672,7 @@ export default function TeacherPage() {
       }
       setPendingApprove(false);
       updatePeriod(curYm, { status: 'approved' });
+      syncDemoPeriodStatus(curYm, 'approved');
       gotoSection('notify');
     } finally { setApproving(false); }
   }
@@ -789,7 +807,7 @@ export default function TeacherPage() {
     {/* ---- 月份列 ---- */}
     <div className="wnav">
       <button type="button" aria-label="上個月" disabled={ymKeys.indexOf(curYm) === 0} onClick={() => { setCurYm(ymKeys[ymKeys.indexOf(curYm) - 1]); setNotice(''); }}>‹</button>
-      <b>{ymLabel(curYm)} <span className="pillt">{STATUS_LABEL[period.status]}</span></b>
+      <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, students.length)}</span></b>
       <button type="button" aria-label="下個月"
         onClick={() => {
           setNotice('');

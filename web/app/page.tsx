@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import CollapsibleSlotGrid from '@/components/CollapsibleSlotGrid';
 import PresetChips from '@/components/PresetChips';
 import { DEMO_PERIOD, slotBlocked, type DemoPeriod } from '@/lib/period';
-import { getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern, saveDemoSubmittedAvailability, getDemoTeacherSettings, type DemoStudent } from '@/lib/teacherDemo';
+import {
+  getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern,
+  saveDemoSubmittedAvailability, getDemoTeacherSettings, getDemoPeriodStatus, PERIOD_STATUS_STORAGE_PREFIX, type DemoStudent,
+} from '@/lib/teacherDemo';
 import { analyzeWeeklyPattern, datesBetween, md, weekday } from '@/lib/scheduling';
 import { applyPatternToBlankMonth, applyPresetToSelection, deriveWeeklyPattern, touchedWeekdays, type WeeklyPattern } from '@/lib/weeklyPattern';
 import { STUDENT_PRESETS } from '@/lib/presets';
@@ -27,6 +30,9 @@ export default function Page() {
   const [realPeriod, setRealPeriod] = useState<ActivePeriod | null>(null);
   const [realTeacherAvailability, setRealTeacherAvailability] = useState<Set<string>>(new Set());
   const [noOpenPeriod, setNoOpenPeriod] = useState(false);
+  // 展示模式：老師完成自動排課後，這個月就不能再編輯了（跟真老師模式靠資料庫 periods.status
+  // 是同一個規則，只是展示模式沒有資料庫，額外存一份在 localStorage，見 lib/teacherDemo.ts）。
+  const [demoLocked, setDemoLocked] = useState(false);
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
   // 在 LINE 裡用 LIFF 打開連結時，網址上的 ?t=... 一開始會被 LIFF 包成 liff.state 參數，
   // liff.init() 跑完才會把網址復原成正常的 ?t=...。這裡要先等 LIFF 準備好才讀網址參數，
@@ -110,6 +116,18 @@ export default function Page() {
     }).catch(() => setNoOpenPeriod(true));
   }, [resolved]);
 
+  // 展示模式：同一件事換個來源——問 localStorage 而不是資料庫，而且要能跨分頁即時反映
+  // （老師那頁按「自動排課」之後，學生這頁不用重新整理也會被鎖住）。
+  useEffect(() => {
+    if (!resolved || resolved.isReal) return;
+    const key = PERIOD_STATUS_STORAGE_PREFIX + resolved.id + '|' + DEMO_PERIOD.ym;
+    const sync = () => setDemoLocked(getDemoPeriodStatus(resolved.id, DEMO_PERIOD.ym) === 'locked');
+    sync();
+    const onStorage = (e: StorageEvent) => { if (e.key === key) sync(); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [resolved]);
+
   const P: ActivePeriod | null = resolved?.isReal ? realPeriod : DEMO_PERIOD;
   const teacherName = resolved?.name ?? '';
   const courseName = resolved?.courseName || '皮拉提斯';
@@ -187,6 +205,12 @@ export default function Page() {
     return (<main>
       <h1>🌸 {teacherName} 的{courseName}課程</h1>
       <p className="sub">{joined.name} 你好，目前沒有開放選課，請等老師通知開放時間。</p>
+    </main>);
+  }
+  if (!resolved.isReal && demoLocked) {
+    return (<main>
+      <h1>🌸 {teacherName} 的{courseName}課程</h1>
+      <p className="sub">{joined.name} 你好，這個月已經完成排課，不能再修改時段了，請等老師用 LINE 通知你的上課時間。</p>
     </main>);
   }
   if (!P) return <main />; // 真老師模式：還在讀取這個月的設定
