@@ -576,9 +576,11 @@ export default function TeacherPage() {
       if (!res.ok) { setNotice(data?.error || '操作失敗，請稍後再試。'); return; }
       updatePeriod(curYm, { status: data.status });
       if (open) {
-        setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
-        setHoursPopupKind('opened');
-        setShowHoursPopup(true);
+        // 「把這段訊息傳給學生」那張分享卡只在存時段（confirmHours）時跳，不是在這裡——分享卡的內容
+        // 是從上班時段算出來的，開關本身跟時段內容無關，這裡開了但時段還空著的話，分享卡只會讓她
+        // 把一段「本月無上班」的誤導訊息傳給學生。改成一句平實的提示，時段空的話順便提醒她去設定。
+        setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`
+          + (teacherAvailability.size === 0 ? '記得去設定上班時段，不然學生進來會看到空的。' : ''));
       } else {
         setNotice(`已關閉 ${+curYm.slice(5)} 月的收集，學生暫時看不到這個月的選課畫面。`);
       }
