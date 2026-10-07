@@ -324,6 +324,9 @@ export default function TeacherPage() {
   // 真老師模式排課要真的打資料庫，不像展示模式是瞬間算完的，按鈕要有「處理中」的反饋，
   // 不然看起來像沒反應。
   const [scheduling, setScheduling] = useState(false);
+  // 開關那支 API 也要打資料庫，同一個道理：沒有這個狀態的話，手滑點兩下中間那段空檔沒有任何反饋，
+  // 感覺「很遲鈍」，容易在請求還沒回來之前又點一次，兩個請求前後蓋過去造成畫面跟資料庫對不起來。
+  const [togglingOpen, setTogglingOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetState | null>(null);
 
   const period = periods[curYm];
@@ -563,20 +566,23 @@ export default function TeacherPage() {
   // （FIRST_YM 固定一開始就是收集中，不需要另外開關）。只能在排課之前切換，已經排過課的月份
   // 這顆開關會被停用，要重開走既有的「重新排課」。
   async function openPeriod(open: boolean) {
-    if (!realSession) return;
-    const res = await fetch(`/api/teacher/periods/${curYm}/open`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ open }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setNotice(data?.error || '操作失敗，請稍後再試。'); return; }
-    updatePeriod(curYm, { status: data.status });
-    if (open) {
-      setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
-      setHoursPopupKind('opened');
-      setShowHoursPopup(true);
-    } else {
-      setNotice(`已關閉 ${+curYm.slice(5)} 月的收集，學生暫時看不到這個月的選課畫面。`);
-    }
+    if (!realSession || togglingOpen) return;
+    setTogglingOpen(true);
+    try {
+      const res = await fetch(`/api/teacher/periods/${curYm}/open`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ open }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setNotice(data?.error || '操作失敗，請稍後再試。'); return; }
+      updatePeriod(curYm, { status: data.status });
+      if (open) {
+        setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`);
+        setHoursPopupKind('opened');
+        setShowHoursPopup(true);
+      } else {
+        setNotice(`已關閉 ${+curYm.slice(5)} 月的收集，學生暫時看不到這個月的選課畫面。`);
+      }
+    } finally { setTogglingOpen(false); }
   }
 
   // ---------- 學生 ----------
@@ -872,8 +878,12 @@ export default function TeacherPage() {
     {realSession && (
       <div className="card remember-row" style={{ marginBottom: 12 }}>
         {period.status === 'closed' || period.status === 'collecting' || period.status === 'upcoming' ? (<>
-          <input type="checkbox" id="openPeriodChk" checked={period.status === 'collecting'} onChange={e => openPeriod(e.target.checked)} />
-          <label htmlFor="openPeriodChk">開放這個月收集時段</label>
+          <label className="switch">
+            <input type="checkbox" checked={period.status === 'collecting'} disabled={togglingOpen}
+              onChange={e => openPeriod(e.target.checked)} />
+            <span className="slider" />
+          </label>
+          <span>{togglingOpen ? '處理中…' : '開放這個月收集時段'}</span>
         </>) : (
           <p className="hint" style={{ margin: 0 }}>這個月已經排課了，要重新開放請用下面的「重新排課」。</p>
         )}
@@ -1039,7 +1049,14 @@ export default function TeacherPage() {
               </div>
             )}
 
-            <button className="btn pri" style={{ width: '100%', marginTop: 10 }} disabled={!allFilled || scheduling} onClick={runAutoSchedule}>{scheduling ? '排課中…' : '自動排課'}</button>
+            {/* 已經排過課的月份（draft／approved／notified）不能再直接按「自動排課」重排一次——
+                要嘛去下面「確認課表」用「重新排課」，先清掉再重排，不是在這裡悄悄蓋掉舊結果。 */}
+            {(period.status === 'draft' || period.status === 'approved' || period.status === 'notified') && (
+              <p className="hint" style={{ marginTop: 8 }}>這個月已經排過課了，要重新排課請到下面「確認課表」按「重新排課」。</p>
+            )}
+            <button className="btn pri" style={{ width: '100%', marginTop: 10 }}
+              disabled={!allFilled || scheduling || period.status === 'draft' || period.status === 'approved' || period.status === 'notified'}
+              onClick={runAutoSchedule}>{scheduling ? '排課中…' : '自動排課'}</button>
           </div></div>
 
           {/* ---- 確認課表：排課結果、待補、順延、重新排課／確認課表 ---- */}

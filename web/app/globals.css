@@ -152,4 +152,14 @@ textarea { width:100%; resize:none; border-radius:10px; border:1px solid var(--l
 .remember-row { display:flex; align-items:center; gap:9px; font-size:1rem; color:var(--ink); }
 .remember-row input[type="checkbox"] { accent-color:var(--on); width:19px; height:19px; flex:0 0 auto; }
 
+/* 開關（例如「開放這個月收集時段」）：真的滑動式 switch，不是打勾用的方形 checkbox。 */
+.switch { position:relative; display:inline-block; width:46px; height:27px; flex:0 0 auto; }
+.switch input { position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.switch .slider { position:absolute; inset:0; background:var(--line); border-radius:999px; transition:background .15s; }
+.switch .slider::before { content:""; position:absolute; height:21px; width:21px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform .15s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.switch input:checked + .slider { background:var(--on); }
+.switch input:checked + .slider::before { transform:translateX(19px); }
+.switch input:disabled { cursor:not-allowed; }
+.switch input:disabled + .slider { opacity:.5; }
+
 :focus-visible { outline:3px solid var(--on); outline-offset:2px; }
