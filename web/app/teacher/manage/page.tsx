@@ -189,11 +189,8 @@ export default function ManageTeachersPage() {
         {studentInviteLink && <CopyBtn text={studentInviteLink} />}
       </div>
 
-      <div className="card">
-        <b>邀請新老師</b>
-        {origin ? <div className="msg">{`${origin}/teacher`}</div> : <p className="m">網址準備中…</p>}
-        {origin && <CopyBtn text={`${origin}/teacher`} />}
-      </div>
+      {/* 「邀請新老師」先拿掉：這個連結點了只是去登入頁，沒有白名單的 LINE 帳號登入會直接被擋下，
+          連結本身不會自動幫對方開通——新增老師目前還是要先拿到對方的 LINE 代碼，手動加進 teachers 表。 */}
 
       <a className="btn outline" href="/api/auth/line/logout" style={{ width: '100%' }}>登出</a>
     </>)}

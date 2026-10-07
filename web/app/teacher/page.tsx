@@ -209,6 +209,10 @@ export default function TeacherPage() {
   // 沒登入時（例如登出後）主要應該是導去 LINE 登入，不是直接看到展示模式的切換鈕——
   // 展示模式只在按了「試用展示版」之後才出現，避免真老師登出後誤以為自己要選 Joanna/Coco。
   const [demoMode, setDemoMode] = useState(false);
+  // 還沒登入、也還沒按「試用展示版」的那個畫面（下面那個 if 區塊）本來沒有顯示 notice，
+  // 導致白名單沒過（not_whitelisted）那組要交給管理者的代碼完全看不到，登入的人會以為「點了沒反應」。
+  // 這組代碼額外存一份，那個畫面才讀得到、才能直接複製。
+  const [loginErrorUid, setLoginErrorUid] = useState<string | null>(null);
   // 「上班時段」通知文字的自訂開頭／結尾（在「老師管理」頁設定），展示模式永遠是空字串、不受影響。
   const [hoursPrefix, setHoursPrefix] = useState('');
   const [hoursSuffix, setHoursSuffix] = useState('');
@@ -245,7 +249,8 @@ export default function TeacherPage() {
         supabase_error: '連線資料庫時發生錯誤，請稍後再試。',
       };
       const uid = qs.get('uid');
-      setNotice((msg[err] ?? '登入失敗，請再試一次。') + (uid ? `請把這組代碼交給管理者加入 teachers 表：${uid}` : ''));
+      setNotice((msg[err] ?? '登入失敗，請再試一次。') + (uid ? '請把下面這組代碼交給管理者加入老師名單：' : ''));
+      if (uid) setLoginErrorUid(uid);
       window.history.replaceState(null, '', '/teacher');
     }
   }, []);
@@ -785,6 +790,9 @@ export default function TeacherPage() {
     return (<main style={{ paddingTop: '20vh', textAlign: 'center' }}>
       <h1>🌸 排課助手</h1>
       <p className="sub">老師請用 LINE 登入管理自己的課表。</p>
+      {notice && <p className="toast" role="status">{notice}</p>}
+      {loginErrorUid && <div className="msg" style={{ textAlign: 'left' }}>{loginErrorUid}</div>}
+      {loginErrorUid && <CopyBtn text={loginErrorUid} />}
       <a className="btn pri" style={{ width: '100%', marginTop: 24 }} href="/api/auth/line/login">用 LINE 登入</a>
       <button className="btn outline" style={{ width: '100%', marginTop: 10 }} onClick={() => setDemoMode(true)}>試用展示版</button>
     </main>);
