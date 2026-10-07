@@ -39,7 +39,7 @@ export async function GET() {
 
   const periodIds = (periods ?? []).map(p => p.id);
   const [{ data: lessons }, { data: unassignedRows }] = await Promise.all([
-    periodIds.length ? supabase.from('lessons').select('id,period_id,student_id,date,start_min,teacher_name').eq('status', 'active').in('period_id', periodIds) : Promise.resolve({ data: [] as any[] }),
+    periodIds.length ? supabase.from('lessons').select('id,period_id,student_id,date,start_min,teacher_name,checked_in_at').eq('status', 'active').in('period_id', periodIds) : Promise.resolve({ data: [] as any[] }),
     periodIds.length ? supabase.from('unassigned').select('id,period_id,student_id,week_start,reason').in('period_id', periodIds) : Promise.resolve({ data: [] as any[] }),
   ]);
 
@@ -48,7 +48,7 @@ export async function GET() {
   for (const p of periods ?? []) periodsOut[p.ym] = { status: p.status, lessons: [], unassigned: [], notified: false, log: [] };
   for (const l of lessons ?? []) {
     const ym = ymById.get(l.period_id); if (!ym) continue;
-    (periodsOut[ym].lessons as unknown[]).push({ id: l.id, studentId: l.student_id, date: l.date, start: l.start_min, teacherName: l.teacher_name ?? undefined });
+    (periodsOut[ym].lessons as unknown[]).push({ id: l.id, studentId: l.student_id, date: l.date, start: l.start_min, teacherName: l.teacher_name ?? undefined, checkedInAt: l.checked_in_at ?? undefined });
   }
   for (const u of unassignedRows ?? []) {
     const ym = ymById.get(u.period_id); if (!ym) continue;

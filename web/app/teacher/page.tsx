@@ -38,7 +38,7 @@ const isBlockedGlobal = (d: string, s: number) => weekday(d) === 3 && s >= parse
 const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 
 // id 是 number：展示模式用流水號；真老師模式是資料庫給的 UUID 字串。
-interface Lesson { id: number | string; studentId: string; date: string; start: number; teacherName?: string }
+interface Lesson { id: number | string; studentId: string; date: string; start: number; teacherName?: string; checkedInAt?: string }
 interface UnassignedUI { id?: string; studentId: string; weekStart: string; reason: UnassignedReason; windows: string[] }
 interface LogEntry { kind: 'notify' | 'remind'; time: string; studentId: string; text: string }
 interface PeriodState { status: 'upcoming' | 'collecting' | 'draft' | 'approved' | 'notified'; lessons: Lesson[]; unassigned: UnassignedUI[]; notified: boolean; log: LogEntry[] }
@@ -1210,6 +1210,7 @@ function LessonList({ lessons, studentName, onChangeTime, onSub }: {
           {header}
           <div className="li">
             <span>{md(l.date)}（{WD[weekday(l.date)]}）{hhmm(l.start)} {studentName(l.studentId)}
+              {l.checkedInAt && <span className="pillt" style={{ marginLeft: 6 }}>✅ 已簽到</span>}
               {l.teacherName && <><br /><span className="m">代課：{l.teacherName}</span></>}
             </span>
             <span>

@@ -126,7 +126,10 @@ export function carryForward(
 
 export interface SchedStudent { id: string; name: string }
 export interface Lesson { studentId: string; date: string; start: number }
-export type UnassignedReason = 'taken' | 'teacher_unavailable' | 'no_selection';
+// leave_requested 不是排課演算法產生的，是學生在自己的課表卡片按「請假」時，API 直接插入一筆
+// unassigned（見 app/api/students/lessons/[lessonId]/leave/route.ts），借用同一套「待補其他老師」
+// UI 讓老師安排新時間，不用另外做一套畫面。
+export type UnassignedReason = 'taken' | 'teacher_unavailable' | 'no_selection' | 'leave_requested';
 export interface UnassignedEntry { studentId: string; weekStart: string; reason: UnassignedReason; windows: string[] }
 export interface ScheduleResult { lessons: Lesson[]; unassigned: UnassignedEntry[] }
 
@@ -134,6 +137,7 @@ export const unassignedReasonLabel: Record<UnassignedReason, string> = {
   taken: 'Joanna 的時段被其他學生佔滿',
   teacher_unavailable: '學生選的時段 Joanna 不上班',
   no_selection: '這週沒有選時段',
+  leave_requested: '學生請假',
 };
 
 export interface ScheduleInput {

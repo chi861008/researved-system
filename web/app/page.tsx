@@ -7,7 +7,7 @@ import {
   getAllTeachers, seedTeacherAvailability, getMyJoin, joinAsStudent, getDemoStudentPattern, saveDemoStudentPattern,
   saveDemoSubmittedAvailability, getDemoTeacherSettings, getDemoPeriodStatus, PERIOD_STATUS_STORAGE_PREFIX, type DemoStudent,
 } from '@/lib/teacherDemo';
-import { analyzeWeeklyPattern, datesBetween, md, weekday } from '@/lib/scheduling';
+import { analyzeWeeklyPattern, datesBetween, hhmm, md, weekday, weekdayLabel } from '@/lib/scheduling';
 import { applyPatternToBlankMonth, applyPresetToSelection, deriveWeeklyPattern, touchedWeekdays, type WeeklyPattern } from '@/lib/weeklyPattern';
 import { STUDENT_PRESETS } from '@/lib/presets';
 import { defaultCourseRuleLines } from '@/lib/courseDefaults';
@@ -20,6 +20,7 @@ const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 type ActivePeriod = Pick<DemoPeriod, 'ym' | 'from' | 'to' | 'starts' | 'lessonMinutes' | 'weeklyBlocks'>;
 // 真老師模式的學生記錄多帶一個「記住的常用時段」，展示模式永遠是 undefined，從 localStorage 另外查。
 type JoinedStudent = DemoStudent & { weeklyPattern?: WeeklyPattern | null; existingAvailability?: string[] };
+type ScheduleLesson = { id: string; date: string; start: number; teacherName?: string; checkedInAt?: string };
 
 export default function Page() {
   // 用邀請連結帶的 ?t=teacherId 分辨「這是哪位老師的學生」：先查展示名單（完全不變），
@@ -30,6 +31,9 @@ export default function Page() {
   const [realPeriod, setRealPeriod] = useState<ActivePeriod | null>(null);
   const [realTeacherAvailability, setRealTeacherAvailability] = useState<Set<string>>(new Set());
   const [noOpenPeriod, setNoOpenPeriod] = useState(false);
+  // 真老師模式：排課完成後（noOpenPeriod 代表「不是收集中」，可能是還沒開放、也可能是排完課了），
+  // 改查這支「我的課表」API，有課的話顯示卡片畫面，不是籠統顯示「目前沒有開放選課」。
+  const [mySchedule, setMySchedule] = useState<{ ym: string; lessons: ScheduleLesson[] } | null>(null);
   // 展示模式：老師完成自動排課後，這個月就不能再編輯了（跟真老師模式靠資料庫 periods.status
   // 是同一個規則，只是展示模式沒有資料庫，額外存一份在 localStorage，見 lib/teacherDemo.ts）。
   const [demoLocked, setDemoLocked] = useState(false);
@@ -115,6 +119,18 @@ export default function Page() {
       setRealTeacherAvailability(new Set<string>(data.teacherAvailability));
     }).catch(() => setNoOpenPeriod(true));
   }, [resolved]);
+
+  // 真老師模式：這個月不是收集中（還沒開放，或已經排課），查有沒有已經排好的課，有的話顯示
+  // 「我的課表」卡片畫面，不要只顯示籠統的「目前沒有開放選課」。
+  useEffect(() => {
+    if (!resolved?.isReal || !joined || !noOpenPeriod) return;
+    fetch('/api/students/schedule', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken, teacherId: resolved.id }),
+    }).then(r => r.json()).then(data => {
+      if (data.lessons?.length) setMySchedule({ ym: data.ym, lessons: data.lessons });
+    }).catch(() => {});
+  }, [resolved, joined, noOpenPeriod, idToken]);
 
   // 展示模式：同一件事換個來源——問 localStorage 而不是資料庫，而且要能跨分頁即時反映
   // （老師那頁按「自動排課」之後，學生這頁不用重新整理也會被鎖住）。
@@ -202,6 +218,9 @@ export default function Page() {
   }
 
   if (resolved.isReal && noOpenPeriod) {
+    if (mySchedule) {
+      return <MyScheduleView teacherName={teacherName} studentName={joined.name} ym={mySchedule.ym} initialLessons={mySchedule.lessons} idToken={idToken} />;
+    }
     return (<main>
       <h1>🌸 {teacherName} 的{courseName}課程</h1>
       <p className="sub">{joined.name} 你好，目前沒有開放選課，請等老師通知開放時間。</p>
@@ -382,5 +401,78 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
     <div className="bar"><div>
       <button className="send" disabled={busy} onClick={submit}>{busy ? '加入中…' : '加入'}</button>
     </div></div>
+  </main>);
+}
+
+// 排課完成後（不管是還沒開放還是已經排完課，noOpenPeriod 都會是 true）學生看到的「我的課表」：
+// 每堂課一張卡片，可以請假或上課當天打卡。請假一定要經過老師安排新時間才算數（見
+// app/api/students/lessons/[lessonId]/leave/route.ts 的註解），這裡只負責送出請求、不會自己改時間。
+function MyScheduleView({ teacherName, studentName, ym, initialLessons, idToken }: {
+  teacherName: string; studentName: string; ym: string; initialLessons: ScheduleLesson[]; idToken: string | null;
+}) {
+  const [lessons, setLessons] = useState(initialLessons);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingLeaveId, setPendingLeaveId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  async function requestLeave(l: ScheduleLesson) {
+    setBusyId(l.id);
+    try {
+      const res = await fetch(`/api/students/lessons/${l.id}/leave`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || '請假失敗');
+      setLessons(prev => prev.filter(x => x.id !== l.id));
+      setNotice('已送出請假，老師會幫你安排新時間。');
+    } catch (e) { setNotice((e as Error).message + '，請稍後再試。'); }
+    finally { setBusyId(null); setPendingLeaveId(null); }
+  }
+
+  async function checkIn(l: ScheduleLesson) {
+    setBusyId(l.id);
+    try {
+      const res = await fetch(`/api/students/lessons/${l.id}/check-in`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || '打卡失敗');
+      setLessons(prev => prev.map(x => x.id === l.id ? { ...x, checkedInAt: new Date().toISOString() } : x));
+      setNotice('已打卡！');
+    } catch (e) { setNotice((e as Error).message + '，請稍後再試。'); }
+    finally { setBusyId(null); }
+  }
+
+  return (<main>
+    <h1>🌸 {+ym.slice(5)} 月我的課表</h1>
+    <p className="sub">{studentName} 你好，這是你這個月的上課時間；請假會請老師幫你安排新時間，打卡要在上課當天才能按。</p>
+    {notice && <p className="toast-overlay" role="status">{notice}</p>}
+    {!lessons.length && <p className="sub">這個月目前沒有排定的課，請等老師通知。</p>}
+    {lessons.map(l => {
+      const isToday = l.date === today;
+      return (
+        <div className="card" key={l.id}>
+          <b>{md(l.date)}（{weekdayLabel(l.date)}）{hhmm(l.start)}</b>
+          <p className="m">授課老師：{l.teacherName || teacherName}{l.teacherName ? '（代課）' : ''}</p>
+          {l.checkedInAt ? (
+            <p className="m">✅ 已簽到</p>
+          ) : (
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="btn outline" disabled={busyId === l.id}
+                onClick={() => pendingLeaveId === l.id ? requestLeave(l) : setPendingLeaveId(l.id)}>
+                {pendingLeaveId === l.id ? '確定請假' : '請假'}
+              </button>
+              <button className="btn" disabled={busyId === l.id || !isToday} onClick={() => checkIn(l)}>打卡</button>
+            </div>
+          )}
+        </div>
+      );
+    })}
   </main>);
 }
