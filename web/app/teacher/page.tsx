@@ -611,6 +611,9 @@ export default function TeacherPage() {
   // 已經排好的結果，從那裡重排比較容易誤觸，值得多一層確認。
   async function runAutoSchedule() {
     if (!allFilled || scheduling) return;
+    // 老師把上班時段全部清空了卻忘記重設（例如改時段手滑清空）：排課只會把每個人都排成「待補」，
+    // 看起來像排課失敗，其實是還沒設定時段——直接擋下、提醒她回去設定，不要讓她誤以為排課壞了。
+    if (teacherAvailability.size === 0) { setNotice('這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。'); return; }
     setScheduling(true);
     try {
       // 排課失敗（例如伺服器錯誤）就留在「自動排課」這一欄讓她重試，不要跳到還是空的「確認課表」，

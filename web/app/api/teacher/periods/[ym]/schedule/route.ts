@@ -23,6 +23,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
     supabase.from('students').select('id,name').eq('teacher_id', session.id),
     supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id),
   ]);
+  // 老師把上班時段全部取消掉（例如改時段時手滑清空）卻忘記重設，這時候排課只會把每個人都排成
+  // 「待補」，看起來像排課失敗，其實是還沒設定時段——直接擋下、提醒她回去設定，比排一堆待補清楚。
+  if (!teacherSlots?.length) return NextResponse.json({ error: '這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。' }, { status: 409 });
+
   const studentIds = (students ?? []).map(s => s.id);
   const { data: studentSlotRows } = studentIds.length
     ? await supabase.from('slots').select('owner_id,date,start_min').eq('owner_type', 'student').in('owner_id', studentIds)
