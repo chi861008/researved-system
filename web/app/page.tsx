@@ -362,9 +362,12 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
 
   useEffect(() => {
     if (!idToken) return;
+    // 邀請連結帶的 ?ym=，查「之前填過了嗎」時要用這個指定月份，不能再讓後端自己猜——
+    // 現在可能同時好幾個月都在收集中，猜的那套（查唯一收集中的月份）查到兩筆就會整個失效。
+    const ym = new URLSearchParams(window.location.search).get('ym');
     (async () => {
       try {
-        const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId }) });
+        const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, ym }) });
         const data = await res.json().catch(() => ({}));
         if (res.ok && !data.needsName) { onJoined(data); return; }
         if (!res.ok) setError(data?.error || '無法確認你的身分，請重新打開連結。');
@@ -378,7 +381,8 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
     if (!nm) { setError('請輸入你的名字'); return; }
     setBusy(true);
     try {
-      const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, name: nm }) });
+      const ym = new URLSearchParams(window.location.search).get('ym');
+      const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, name: nm, ym }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data?.error || '加入失敗，請稍後再試。'); setBusy(false); return; }
       onJoined(data);

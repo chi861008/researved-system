@@ -8,7 +8,7 @@ import { ymFrom, ymEnd } from '@/lib/ym';
 // 真老師模式的「加入」：不用 localStorage，完全靠已驗證的 LINE userId 判斷「這個人是不是已經加入過」，
 // 換裝置、清瀏覽器資料都還認得出來。沒帶 name 時只是在「檢查有沒有加入過」，查不到才要前端顯示填名字表單。
 export async function POST(req: Request) {
-  const { idToken, teacherId, name } = await req.json().catch(() => ({}));
+  const { idToken, teacherId, name, ym } = await req.json().catch(() => ({}));
   if (!teacherId || !isUuid(teacherId)) return NextResponse.json({ error: '連結不完整' }, { status: 400 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
@@ -18,10 +18,13 @@ export async function POST(req: Request) {
 
   const { data: existing } = await supabase.from('students').select('id,name,weekly_pattern').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
   if (existing) {
-    // 這個學生本月（目前開放選課的那個月）如果已經送出過時段，一起回傳，前端才能把畫面還原成
-    // 跟上次送出時一樣（鎖定＋顯示她真正選過的格子），不然重新打開連結會看起來像沒填過。
+    // 這個連結指定月份（?ym=）如果已經送出過時段，一起回傳，前端才能把畫面還原成跟上次送出時一樣
+    // （鎖定＋顯示她真正選過的格子），不然重新打開連結會看起來像沒填過。現在可能同時好幾個月都在
+    // 收集中，一定要照連結帶的 ym 查那一個月，不能再猜「唯一收集中的月份」（查到兩筆會整個失效）；
+    // 沒帶 ym 的舊連結才退回舊行為。
     let existingAvailability: string[] = [];
-    const { data: period } = await supabase.from('periods').select('ym').eq('teacher_id', teacherId).eq('status', 'collecting').maybeSingle();
+    const query = supabase.from('periods').select('ym').eq('teacher_id', teacherId).eq('status', 'collecting');
+    const { data: period } = typeof ym === 'string' && ym ? await query.eq('ym', ym).maybeSingle() : await query.maybeSingle();
     if (period) {
       const { data: slotRows } = await supabase.from('slots').select('date,start_min')
         .eq('owner_type', 'student').eq('owner_id', existing.id)
