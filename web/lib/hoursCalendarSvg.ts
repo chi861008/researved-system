@@ -31,7 +31,10 @@ function analyzeForImage(sel: Set<string>, dates: string[], starts: number[], le
     typical[w] = best;
     for (const d of days) {
       const lab = labels.get(d)!;
-      if (lab !== best) exceptions.push(lab ? { date: d, kind: 'custom', label: lab } : { date: d, kind: 'off', label: '休假' });
+      // 沒時段的格子一律標「休假」，不管那個星期幾平常算不算有上班（原本只在 best 非空時才標，
+      // 結果整個星期幾都排休時 best 也會是空字串、每天都跟 best 一樣，整排變成空白格，排休完全看不出來）。
+      if (!lab) exceptions.push({ date: d, kind: 'off', label: '休假' });
+      else if (lab !== best) exceptions.push({ date: d, kind: 'custom', label: lab });
     }
   }
   const groups: { t: string; ws: number[] }[] = [];

@@ -61,13 +61,18 @@ export function windowList(sel: Set<SlotKey>, dates: string[], starts: number[],
 export interface WeeklyRun { windowLabel: string; dayLabel: string }
 export interface AnalyzeResult { runs: WeeklyRun[]; off: string[]; changed: string[] }
 
-export function analyzeWeeklyPattern(sel: Set<SlotKey>, dates: string[], starts: number[], lessonMinutes: number): AnalyzeResult {
+// wholeWeekdaysOff：整個星期幾都沒有時段時，要不要把它當成一種「典型」顯示出來（例如老師整個月週日
+// 都不上班）。老師的上班時段要開，不然那個星期幾會整排空白、看起來跟「預設上班」一樣，等於排休
+// 完全不會顯示；學生自己選的時段要關，不然學生沒選的星期幾（本來就是多數）會被當成一堆「不行」洗版。
+export function analyzeWeeklyPattern(sel: Set<SlotKey>, dates: string[], starts: number[], lessonMinutes: number, wholeWeekdaysOff = false): AnalyzeResult {
   const order = [1, 2, 3, 4, 5, 6, 0];
   const typical: Record<number, string> = {};
+  const hasDay: Record<number, boolean> = {};
   const off: string[] = [];
   const changed: string[] = [];
   for (const w of order) {
     const days = dates.filter(d => weekday(d) === w);
+    hasDay[w] = days.length > 0;
     const counts = new Map<string, number>();
     const labels = new Map<string, string>();
     for (const d of days) {
@@ -86,10 +91,11 @@ export function analyzeWeeklyPattern(sel: Set<SlotKey>, dates: string[], starts:
   }
   const groups: { t: string; ws: number[] }[] = [];
   order.forEach((w, i) => {
-    if (!typical[w]) return;
+    const t = typical[w] || (wholeWeekdaysOff && hasDay[w] ? '不上班' : '');
+    if (!t) return;
     const last = groups[groups.length - 1];
-    if (last && last.t === typical[w] && last.ws[last.ws.length - 1] === order[i - 1]) last.ws.push(w);
-    else groups.push({ t: typical[w], ws: [w] });
+    if (last && last.t === t && last.ws[last.ws.length - 1] === order[i - 1]) last.ws.push(w);
+    else groups.push({ t, ws: [w] });
   });
   const runs: WeeklyRun[] = groups.map(g => {
     const n = g.ws.length;

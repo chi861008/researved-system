@@ -465,8 +465,12 @@ export default function TeacherPage() {
 
   // ---------- 上班時間 ----------
   const hoursMessage = useMemo(() => {
-    const a = analyzeWeeklyPattern(teacherAvailability, dates, STARTS, L);
+    // wholeWeekdaysOff=true：整個星期幾都排休（例如用「快速排休」整月封掉週日），也要在這裡顯示
+    // 「週日 不上班」，不然那天會整排空白、跟「預設上班」長得一樣，等於排休完全看不出來。
+    const a = analyzeWeeklyPattern(teacherAvailability, dates, STARTS, L, true);
     const lines = a.runs.map(r => {
+      // 「不上班」不是一段時間範圍，不能照下面那樣拆時間算「最後一堂」，直接照字面顯示就好。
+      if (r.windowLabel === '不上班') return `${r.dayLabel} 不上班`;
       const lastWindow = r.windowLabel.split('、').pop()!;
       const endHM = lastWindow.split('–')[1];
       const [eh, em] = endHM.split(':').map(Number);
@@ -484,14 +488,15 @@ export default function TeacherPage() {
     return breakTimeAutoLink(full);
   }, [teacherAvailability, dates, curYm, weeklyBlock, currentTeacherName, inviteLink, hoursPrefix, hoursSuffix]);
 
-  // 格狀表格收起時顯示的簡短摘要（跟上面的通知文字分開，這個只在頁面裡給自己看）
+  // 格狀表格收起時顯示的簡短摘要（跟上面的通知文字分開，這個只在頁面裡給自己看）。
+  // 「完全還沒設定」跟「某幾天刻意排休、其他天正常上班」是兩回事，前者才顯示這句提示文字
+  // （後面很多地方靠比對這個字串決定要不要顯示分享按鈕），後者要讓 wholeWeekdaysOff 顯示「不上班」。
   const hoursSummaryText = useMemo(() => {
-    const a = analyzeWeeklyPattern(teacherAvailability, dates, STARTS, L);
-    return a.runs.length
-      ? a.runs.map(r => `${r.dayLabel} ${r.windowLabel}`).join('\n') +
-        (a.off.length ? `\n休假：${a.off.map(md).join('、')}` : '') +
-        (a.changed.length ? `\n調整：${a.changed.join('、')}` : '')
-      : '這個月還沒有設定上班時段';
+    if (teacherAvailability.size === 0) return '這個月還沒有設定上班時段';
+    const a = analyzeWeeklyPattern(teacherAvailability, dates, STARTS, L, true);
+    return a.runs.map(r => `${r.dayLabel} ${r.windowLabel}`).join('\n') +
+      (a.off.length ? `\n休假：${a.off.map(md).join('、')}` : '') +
+      (a.changed.length ? `\n調整：${a.changed.join('、')}` : '');
   }, [teacherAvailability, dates]);
 
   // ---------- 月份切換 ----------
@@ -621,8 +626,10 @@ export default function TeacherPage() {
       if (await doSchedule()) gotoSection('confirm');
     } finally { setScheduling(false); }
   }
+  // 重新排課只是把課表清掉、退回收集中，不是在算新課表，不需要等全部填完——而且擋著反而會卡死：
+  // 排完課之後才新增的學生一定是「未填寫」，但她不可能填得到（月份已經不是收集中），只能靠「重新排課」
+  // 退回收集中讓她補填，所以這個按鈕一定要隨時按得下去。
   function requestReschedule() {
-    if (!allFilled) return;
     setRescheduleConfirmOpen(true);
   }
   // 重新排課會清掉已核准／已推播的狀態，確認課表、發送訊息都要重新來一次，
@@ -1030,7 +1037,7 @@ export default function TeacherPage() {
                 </div>
               )}
               <div className="row" style={{ marginTop: 12 }}>
-                <button className="btn outline" disabled={!allFilled} onClick={requestReschedule}>重新排課</button>
+                <button className="btn outline" onClick={requestReschedule}>重新排課</button>
                 <button className="btn pri" disabled={period.status === 'approved' || period.status === 'notified' || approving} onClick={approve}>
                   {approving ? '處理中…' : pendingApprove ? `確認送出（仍有 ${needsTeacher.length} 位次待補）` : '確認課表'}
                 </button>
