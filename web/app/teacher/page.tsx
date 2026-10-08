@@ -4,6 +4,7 @@ import Link from 'next/link';
 import CollapsibleSlotGrid from '@/components/CollapsibleSlotGrid';
 import CopyBtn from '@/components/CopyBtn';
 import SaveImageBtn from '@/components/SaveImageBtn';
+import TeacherNavIcon, { type TeacherNavIconName } from '@/components/TeacherNavIcon';
 import { buildHoursCalendarSvg } from '@/lib/hoursCalendarSvg';
 import {
   DEMO_TEACHERS, DEMO_STUDENTS_BY_TEACHER, seedDemoAvailability, seedTeacherAvailability,
@@ -172,6 +173,10 @@ export default function TeacherPage() {
   // 用來組「邀請連結」的網站網址，只能在瀏覽器端取得（避免 SSR 時網址不一致的 hydration 警告）。
   const [origin, setOrigin] = useState('');
   useEffect(() => { setOrigin(window.location.origin); }, []);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    if (requested === 'hours' || requested === 'plan' || requested === 'students') setTab(requested);
+  }, []);
 
   // ---------- 多老師資料隔離 ----------
   // 展示模式：用按鈕切換「目前登入的老師」，之後會換成真正的 LINE 登入＋白名單比對。
@@ -1295,9 +1300,11 @@ export default function TeacherPage() {
       <div className="bar" style={{ padding: '0 0 env(safe-area-inset-bottom,0px)' }}>
         <div className="tabs" role="tablist">
           {([['hours', '上班時間'], ['plan', '自動排課'], ['students', '學生管理']] as const).map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setNotice(''); if (k === 'plan') setPlanSection('schedule'); }}>{label}</button>
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setNotice(''); if (k === 'plan') setPlanSection('schedule'); }}>
+              <TeacherNavIcon name={k as TeacherNavIconName} /><span>{label}</span>
+            </button>
           ))}
-          <Link href="/teacher/manage" role="tab">老師管理</Link>
+          <Link href="/teacher/manage" role="tab"><TeacherNavIcon name="manage" /><span>老師管理</span></Link>
         </div>
       </div>
     )}

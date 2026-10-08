@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import TeacherNavIcon from '@/components/TeacherNavIcon';
 import { getAllTeachers, getMyTeacherId, MAIN_TEACHER_ID, getDemoTeacherSettings, saveDemoTeacherSettings } from '@/lib/teacherDemo';
 import { defaultCourseRuleLines } from '@/lib/courseDefaults';
 
@@ -185,9 +186,10 @@ export default function ManageTeachersPage() {
     {/* ---- 底部分頁列，跟老師頁共用同一個樣式，直接切換不用先按返回 ---- */}
     <div className="bar" style={{ padding: '0 0 env(safe-area-inset-bottom,0px)' }}>
       <div className="tabs" role="tablist">
-        <Link href="/teacher" role="tab">上班時間</Link>
-        <Link href="/teacher" role="tab">自動排課</Link>
-        <Link href="/teacher/manage" role="tab" aria-selected="true">老師管理</Link>
+        <Link href="/teacher?tab=hours" role="tab"><TeacherNavIcon name="hours" /><span>上班時間</span></Link>
+        <Link href="/teacher?tab=plan" role="tab"><TeacherNavIcon name="plan" /><span>自動排課</span></Link>
+        <Link href="/teacher?tab=students" role="tab"><TeacherNavIcon name="students" /><span>學生管理</span></Link>
+        <Link href="/teacher/manage" role="tab" aria-selected="true"><TeacherNavIcon name="manage" /><span>老師管理</span></Link>
       </div>
     </div>
   </main>);
