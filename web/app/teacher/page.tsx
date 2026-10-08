@@ -426,6 +426,9 @@ export default function TeacherPage() {
     : (origin ? `${origin}/?t=${currentTeacherId}${realSession ? `&ym=${curYm}` : ''}` : '');
 
   const studentName = (id: string) => students.find(s => s.id === id)?.name ?? id;
+  const leaveAlerts = Object.entries(periods).flatMap(([ym, p]) =>
+    p.unassigned.filter(u => u.reason === 'leave_requested').map(u => ({ ym, ...u })),
+  );
   const isBlocked = (d: string, s: number) => weekday(d) === weeklyBlock.weekday && s >= weeklyBlock.start && s < weeklyBlock.end;
 
   // 真老師模式：把目前的上班時段整批送到伺服器（只替換「今天之後」，不動過去的紀錄）。
@@ -989,6 +992,23 @@ export default function TeacherPage() {
       </div>
     )}
 
+    {/* 學生請假不能只藏在「確認課表」的待補清單裡；老師不管停在哪個分頁或月份，都先看到提醒。 */}
+    {leaveAlerts.length > 0 && (
+      <div className="card" style={{ background: 'var(--soft)', borderColor: 'var(--on)', marginBottom: 14 }} role="alert">
+        <b className="warn">⚠️ 有 {leaveAlerts.length} 筆學生請假待重新安排</b>
+        <p className="m" style={{ margin: '6px 0 10px' }}>
+          {leaveAlerts.map(x => `${studentName(x.studentId)}（${+x.ym.slice(5)} 月・${md(x.weekStart)} 起這週）`).join('、')}
+        </p>
+        <button className="btn outline" style={{ width: '100%' }} onClick={() => {
+          const targetYm = leaveAlerts[0].ym;
+          if (targetYm !== curYm) selectMonth(targetYm);
+          setTab('plan');
+          setPlanSection('confirm');
+          setTimeout(() => document.getElementById('section-confirm')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+        }}>前往處理請假</button>
+      </div>
+    )}
+
     {/* ---- 代填模式 ---- */}
     {activeStudent ? (
       <ActingView
@@ -1166,7 +1186,11 @@ export default function TeacherPage() {
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', width: '100%', background: 'none', border: 0, padding: '10px 0', fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
             <span style={{ color: planSection === 'confirm' ? 'var(--ink)' : 'var(--muted)' }}>{planSection === 'confirm' ? '▾' : '▸'} 確認課表</span>
             {planSection !== 'confirm' && (
-              <span className="m" style={{ fontWeight: 400 }}>{hasExistingSchedule ? `已排入 ${period.lessons.length} 堂` : '尚未排課'}</span>
+              <span className={period.unassigned.some(u => u.reason === 'leave_requested') ? 'warn' : 'm'} style={{ fontWeight: 400 }}>
+                {period.unassigned.some(u => u.reason === 'leave_requested')
+                  ? `學生請假 ${period.unassigned.filter(u => u.reason === 'leave_requested').length} 筆待處理`
+                  : hasExistingSchedule ? `已排入 ${period.lessons.length} 堂` : '尚未排課'}
+              </span>
             )}
           </button>
           <div className={`plan-section${planSection === 'confirm' ? ' open' : ''}`}><div className="plan-section-inner">
