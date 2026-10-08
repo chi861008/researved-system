@@ -43,7 +43,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
     return { id: s.id, name: s.name, remainingLessons };
   });
   const { data: studentSlotRows } = studentIds.length
+    // 只讀目前排課月份。若一次讀所有月份，學生時段累積超過 Supabase 單次 1,000 筆上限時，
+    // 排在回傳結果後面的學生會整批消失，明明已填寫卻被引擎判定為 0 格。
     ? await supabase.from('slots').select('owner_id,date,start_min').eq('owner_type', 'student').in('owner_id', studentIds)
+      .gte('date', ymFrom(ym)).lte('date', ymEnd(ym))
     : { data: [] as { owner_id: string; date: string; start_min: number }[] };
   const studentAvailability = new Map<string, Set<string>>();
   for (const id of studentIds) studentAvailability.set(id, new Set());
