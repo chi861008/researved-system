@@ -1108,9 +1108,8 @@ export default function TeacherPage() {
                   </span>
                   <span>
                     {(st.remainingLessons ?? 0) > 0 && <><span className={filled(st) ? '' : 'warn'}>{filled(st) ? '已填寫' : '尚未填寫'}</span>{' '}
-                    <button onClick={() => setActingStudentId(st.id)}>{filled(st) ? '修改' : '幫他填'}</button>{' '}</>}
-                    <button onClick={() => openCredits(st)}>{(st.remainingLessons ?? 0) === 0 ? '續課' : '調整堂數'}</button>{' '}
-                    <button disabled={deletingId === st.id} onClick={() => deleteStudent(st.id)}>{deletingId === st.id ? '刪除中…' : pendingDeleteId === st.id ? '確認刪除' : '刪除'}</button>
+                    <button onClick={() => setActingStudentId(st.id)}>{filled(st) ? '修改時段' : '幫他填時段'}</button></>}
+                    {(st.remainingLessons ?? 0) === 0 && <button onClick={() => { setTab('students'); setNotice('請在這裡替學生增加續課堂數。'); }}>前往續課</button>}
                   </span>
                 </div>
               ))}
@@ -1121,9 +1120,6 @@ export default function TeacherPage() {
               {allFilled && !hasTeacherHours && (
                 <p className="warn" style={{ marginTop: 8 }}>這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。</p>
               )}
-              <button className="m" style={{ width: '100%', background: 'none', border: 0, marginTop: 10, fontWeight: 700, cursor: 'pointer' }} onClick={() => setAddStudentOpen(true)}>
-                ＋ 新增
-              </button>
             </div>
 
             {period.status === 'collecting' && eligibleStudents.some(s => !filled(s)) && (
@@ -1268,7 +1264,6 @@ export default function TeacherPage() {
                 <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
                   <button className="btn" onClick={() => openCredits(st, 'add')}>增加堂數</button>
                   <button className="btn" onClick={() => openCredits(st, 'set')}>調整餘額</button>
-                  <button className="btn" onClick={() => setActingStudentId(st.id)}>{filled(st) ? '修改時段' : '幫他填時段'}</button>
                 </div>
                 {realSession && !st.linked && (
                   <div style={{ marginTop: 10 }}>
