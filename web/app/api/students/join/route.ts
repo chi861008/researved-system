@@ -37,6 +37,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ id: existing.id, name: existing.name, weeklyPattern: existing.weekly_pattern ?? null, existingAvailability, remainingLessons, paused: Boolean(existing.scheduling_paused) });
   }
 
+  // 尚未加入的學生只能透過目前仍在收集時段的月份加入。既有學生仍可通過上面的身分確認，
+  // 以便在月份關閉後查看已排課表；但舊月份連結不能再綁定邀請 token 或建立新學生。
+  let openPeriodQuery = supabase.from('periods').select('id').eq('teacher_id', teacherId).eq('status', 'collecting');
+  if (typeof ym === 'string' && ym) {
+    if (!/^\d{4}-\d{2}$/.test(ym)) return NextResponse.json({ error: '月份格式不正確' }, { status: 400 });
+    openPeriodQuery = openPeriodQuery.eq('ym', ym);
+  }
+  const { data: openPeriod } = await openPeriodQuery.limit(1).maybeSingle();
+  if (!openPeriod) return NextResponse.json({ error: '這個月份目前沒有開放選課，請使用老師最新提供的連結。' }, { status: 409 });
+
   // 老師先建立好的學生用個人 token 綁定。成功後立刻清掉 token，連結即使被轉傳也不能再綁第二個人。
   if (typeof inviteToken === 'string' && inviteToken) {
     const { data: invited } = await supabase.from('students')

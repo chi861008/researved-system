@@ -31,6 +31,7 @@ export default function Page() {
   const [realPeriod, setRealPeriod] = useState<ActivePeriod | null>(null);
   const [realTeacherAvailability, setRealTeacherAvailability] = useState<Set<string>>(new Set());
   const [noOpenPeriod, setNoOpenPeriod] = useState(false);
+  const [periodChecked, setPeriodChecked] = useState(false);
   // 真老師模式：排課完成後（noOpenPeriod 代表「不是收集中」，可能是還沒開放、也可能是排完課了），
   // 改查這支「我的課表」API，有課的話顯示卡片畫面，不是籠統顯示「目前沒有開放選課」。
   const [mySchedule, setMySchedule] = useState<{ ym: string; lessons: ScheduleLesson[]; remainingLessons: number } | null>(null);
@@ -115,13 +116,15 @@ export default function Page() {
   // 後端自己退回舊行為）。
   useEffect(() => {
     if (!resolved?.isReal) return;
+    setPeriodChecked(false);
+    setNoOpenPeriod(false);
     const ym = new URLSearchParams(window.location.search).get('ym');
     const url = ym ? `/api/teachers/${resolved.id}/period?ym=${ym}` : `/api/teachers/${resolved.id}/period`;
     fetch(url).then(r => r.json()).then(data => {
       if (data.noOpenPeriod) { setNoOpenPeriod(true); return; }
       setRealPeriod({ ym: data.ym, from: data.from, to: data.to, starts: data.starts, lessonMinutes: data.lessonMinutes, weeklyBlocks: data.weeklyBlocks });
       setRealTeacherAvailability(new Set<string>(data.teacherAvailability));
-    }).catch(() => setNoOpenPeriod(true));
+    }).catch(() => setNoOpenPeriod(true)).finally(() => setPeriodChecked(true));
   }, [resolved]);
 
   // 真老師模式：這個月不是收集中（還沒開放，或已經排課），查有沒有已經排好的課，有的話顯示
@@ -219,9 +222,13 @@ export default function Page() {
     </main>);
   }
 
+  // 真老師連結要先確認指定月份是否開放，再顯示加入流程；否則已關閉的舊連結會在 API 回來前
+  // 短暫顯示「加入」，也會讓人誤以為連結仍可使用。
+  if (resolved.isReal && !periodChecked) return <main />;
+
   if (!joined) {
     return resolved.isReal
-      ? <RealJoinView teacherId={resolved.id} teacherName={resolved.name} courseName={courseName} idToken={idToken} needLogin={needLogin} onJoined={handleJoined} />
+      ? <RealJoinView teacherId={resolved.id} teacherName={resolved.name} courseName={courseName} idToken={idToken} needLogin={needLogin} periodOpen={!noOpenPeriod} onJoined={handleJoined} />
       : <JoinView teacherId={resolved.id} teacherName={resolved.name} onJoined={setJoined} />;
   }
 
@@ -370,8 +377,8 @@ function JoinView({ teacherId, teacherName, onJoined }: { teacherId: string; tea
 // 真老師模式的加入流程：不用 localStorage，完全靠已驗證的 LINE userId 判斷「加入過了嗎」，
 // 換裝置、清瀏覽器資料都還認得出來。先在沒帶名字的情況下問一次，查到既有記錄就直接登入；
 // 查不到才顯示填名字表單。
-function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, onJoined }: {
-  teacherId: string; teacherName: string; courseName: string; idToken: string | null; needLogin: boolean; onJoined: (s: JoinedStudent) => void;
+function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, periodOpen, onJoined }: {
+  teacherId: string; teacherName: string; courseName: string; idToken: string | null; needLogin: boolean; periodOpen: boolean; onJoined: (s: JoinedStudent) => void;
 }) {
   const [checked, setChecked] = useState(false);
   const [name, setName] = useState('');
@@ -419,6 +426,13 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
     return (<main>
       <h1>🌸 加入 {teacherName} 的{courseName}課程</h1>
       <div className="card"><b className="warn">加入連結無法使用</b><p className="m">{error}</p></div>
+    </main>);
+  }
+
+  if (!periodOpen) {
+    return (<main>
+      <h1>🌸 {teacherName} 的{courseName}課程</h1>
+      <p className="sub">這個月份目前沒有開放選課，請使用老師最新提供的連結。</p>
     </main>);
   }
 
