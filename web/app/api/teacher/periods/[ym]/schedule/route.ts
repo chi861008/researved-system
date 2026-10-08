@@ -56,11 +56,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
     : { data: [] as { student_id: string; date: string }[] };
 
   const scheduleStart = today() > ymFrom(ym) ? addDays(weekStartOf(today()), 7) : ymFrom(ym);
+  const teacherAvailability = rowsToSlotSet(teacherSlots ?? []);
   const result = runScheduling({
     from: ymFrom(ym), to: ymEnd(ym), scheduleStart, lessonMinutes: LESSON_MINUTES, starts: STUDIO_STARTS,
     students: schedStudents,
     studentAvailability,
-    teacherAvailability: rowsToSlotSet(teacherSlots ?? []),
+    teacherAvailability,
     otherPeriodLessons: (otherLessons ?? []).map(l => ({ studentId: l.student_id, date: l.date })),
     existingLessons: [],
   });
@@ -88,9 +89,30 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
   });
   const scheduledCount = new Map<string, number>();
   for (const l of result.lessons) scheduledCount.set(l.studentId, (scheduledCount.get(l.studentId) ?? 0) + 1);
+  const diagnostics = schedStudents.map(student => {
+    const selected = [...(studentAvailability.get(student.id) ?? [])]
+      .filter(key => key.slice(0, 10) >= scheduleStart && key.slice(0, 10) <= ymEnd(ym));
+    const overlapCount = selected.filter(key => teacherAvailability.has(key)).length;
+    const reasons = [...new Set(result.unassigned.filter(row => row.studentId === student.id).map(row => row.reason))];
+    return {
+      studentId: student.id,
+      name: student.name,
+      remainingLessons: student.remainingLessons,
+      selectedSlots: selected.length,
+      overlapSlots: overlapCount,
+      scheduledLessons: scheduledCount.get(student.id) ?? 0,
+      reasons,
+    };
+  });
+  // 只記錄排課判斷的數量與原因，方便正式環境除錯；不記錄實際日期、時間或任何登入資訊。
+  console.info('schedule-diagnostics', JSON.stringify({
+    ym,
+    scheduleStart,
+    students: diagnostics.map(({ name: _name, ...counts }) => counts),
+  }));
   const remainingLessons = Object.fromEntries(schedStudents.map(s => [
     s.id,
     Math.max(0, (remainingBefore.get(s.id) ?? 0) - (scheduledCount.get(s.id) ?? 0)),
   ]));
-  return NextResponse.json({ lessons: lessonsOut, unassigned: unassignedOut, remainingLessons });
+  return NextResponse.json({ lessons: lessonsOut, unassigned: unassignedOut, remainingLessons, diagnostics });
 }

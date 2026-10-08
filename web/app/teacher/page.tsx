@@ -46,6 +46,10 @@ const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
 // id 是 number：展示模式用流水號；真老師模式是資料庫給的 UUID 字串。
 interface Lesson { id: number | string; studentId: string; date: string; start: number; teacherName?: string; checkedInAt?: string }
 interface UnassignedUI { id?: string; studentId: string; weekStart: string; reason: UnassignedReason; windows: string[] }
+interface ScheduleDiagnostic {
+  studentId: string; name: string; remainingLessons: number; selectedSlots: number;
+  overlapSlots: number; scheduledLessons: number; reasons: UnassignedReason[];
+}
 interface LogEntry { kind: 'notify' | 'remind'; time: string; studentId: string; text: string }
 // 'upcoming'：還沒建過這個月的 row（純前端狀態，不會寫進資料庫）。'closed'：row 已經存在（可能已經
 // 存過上班時段），但「開放給學生填」這個開關還沒打開——對應真資料庫 periods.status 新增的那個值。
@@ -353,6 +357,7 @@ export default function TeacherPage() {
   // 真老師模式排課要真的打資料庫，不像展示模式是瞬間算完的，按鈕要有「處理中」的反饋，
   // 不然看起來像沒反應。
   const [scheduling, setScheduling] = useState(false);
+  const [scheduleDiagnostics, setScheduleDiagnostics] = useState<ScheduleDiagnostic[]>([]);
   // 開關那支 API 也要打資料庫，同一個道理：沒有這個狀態的話，手滑點兩下中間那段空檔沒有任何反饋，
   // 感覺「很遲鈍」，容易在請求還沒回來之前又點一次，兩個請求前後蓋過去造成畫面跟資料庫對不起來。
   const [togglingOpen, setTogglingOpen] = useState(false);
@@ -777,6 +782,7 @@ export default function TeacherPage() {
       for (const l of period.lessons) restoredByStudent.set(l.studentId, (restoredByStudent.get(l.studentId) ?? 0) + 1);
       setStudents(prev => prev.map(s => ({ ...s, remainingLessons: (s.remainingLessons ?? 0) + (restoredByStudent.get(s.id) ?? 0) })));
       updatePeriod(curYm, { lessons: [], unassigned: [], status: 'collecting', notified: false });
+      setScheduleDiagnostics([]);
       syncDemoPeriodStatus(curYm, 'collecting');
       setNotice('已清除課表，恢復成收集中。調整好學生名單或上班時段後，再按「自動排課」重新排一次。');
       setRescheduleConfirmOpen(false);
@@ -789,6 +795,7 @@ export default function TeacherPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setNotice(data?.error || '排課失敗，請稍後再試。'); return false; }
       if (data.remainingLessons) setStudents(prev => prev.map(s => ({ ...s, remainingLessons: data.remainingLessons[s.id] ?? s.remainingLessons ?? 0 })));
+      setScheduleDiagnostics(Array.isArray(data.diagnostics) ? data.diagnostics : []);
       updatePeriod(curYm, { lessons: data.lessons, unassigned: data.unassigned, status: 'draft', notified: false });
       setNotice('');
       return true;
@@ -1163,6 +1170,24 @@ export default function TeacherPage() {
             )}
           </button>
           <div className={`plan-section${planSection === 'confirm' ? ' open' : ''}`}><div className="plan-section-inner">
+          {scheduleDiagnostics.length > 0 && (
+            <div className="card">
+              <b>本次排課檢查</b>
+              {scheduleDiagnostics.map(item => {
+                let result = `已排入 ${item.scheduledLessons} 堂`;
+                if (item.remainingLessons <= 0) result = '沒有剩餘堂數';
+                else if (item.selectedSlots === 0) result = '這個月沒有可排的學生時段';
+                else if (item.overlapSlots === 0) result = '學生時段與老師上班時段沒有完全重疊';
+                else if (item.scheduledLessons === 0) result = '重疊時段已被占用，或同一週已有其他課';
+                return (
+                  <div className="li" key={item.studentId}>
+                    <span><b>{item.name}</b><br /><span className="m">已填 {item.selectedSlots} 格・與老師重疊 {item.overlapSlots} 格</span></span>
+                    <span className={item.scheduledLessons > 0 ? '' : 'warn'}>{result}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {
             !period.lessons.length && !period.unassigned.length ? (
               <div className="card">
