@@ -31,32 +31,57 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
   if (!teacherSlots?.length) return NextResponse.json({ error: '這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。' }, { status: 409 });
 
   const studentIds = (students ?? []).map(s => s.id);
-  const { data: activeCreditLessons } = studentIds.length
-    ? await supabase.from('lessons').select('student_id').eq('teacher_id', session.id).eq('status', 'active').in('student_id', studentIds)
-    : { data: [] as { student_id: string }[] };
+  const activeCreditLessons: { id: string; student_id: string }[] = [];
+  if (studentIds.length) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('lessons').select('id,student_id')
+        .eq('teacher_id', session.id).eq('status', 'active').in('student_id', studentIds)
+        .order('id').range(from, from + 999);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      activeCreditLessons.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+  }
   const usedCredits = new Map<string, number>();
-  for (const l of activeCreditLessons ?? []) usedCredits.set(l.student_id, (usedCredits.get(l.student_id) ?? 0) + 1);
+  for (const l of activeCreditLessons) usedCredits.set(l.student_id, (usedCredits.get(l.student_id) ?? 0) + 1);
   const remainingBefore = new Map<string, number>();
   const schedStudents = (students ?? []).map(s => {
     const remainingLessons = Math.max(0, (s.lesson_credits ?? 0) - (usedCredits.get(s.id) ?? 0));
     remainingBefore.set(s.id, remainingLessons);
     return { id: s.id, name: s.name, remainingLessons };
   });
-  const { data: studentSlotRows } = studentIds.length
-    // 只讀目前排課月份。若一次讀所有月份，學生時段累積超過 Supabase 單次 1,000 筆上限時，
-    // 排在回傳結果後面的學生會整批消失，明明已填寫卻被引擎判定為 0 格。
-    ? await supabase.from('slots').select('owner_id,date,start_min').eq('owner_type', 'student').in('owner_id', studentIds)
-      .gte('date', ymFrom(ym)).lte('date', ymEnd(ym))
-    : { data: [] as { owner_id: string; date: string; start_min: number }[] };
+  // 只讀目前排課月份，並且每 1,000 筆分頁讀到完。只縮小月份還不夠：未來學生變多時，
+  // 單月仍可能超過 Supabase 單次回傳上限，不能再讓排在後面的學生靜默消失。
+  const studentSlotRows: { owner_id: string; date: string; start_min: number }[] = [];
+  if (studentIds.length) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('slots').select('owner_id,date,start_min')
+        .eq('owner_type', 'student').in('owner_id', studentIds)
+        .gte('date', ymFrom(ym)).lte('date', ymEnd(ym))
+        .order('owner_id').order('date').order('start_min').range(from, from + 999);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      studentSlotRows.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+  }
   const studentAvailability = new Map<string, Set<string>>();
   for (const id of studentIds) studentAvailability.set(id, new Set());
-  for (const row of studentSlotRows ?? []) studentAvailability.get(row.owner_id)?.add(`${row.date}|${row.start_min}`);
+  for (const row of studentSlotRows) studentAvailability.get(row.owner_id)?.add(`${row.date}|${row.start_min}`);
 
   const { data: otherPeriods } = await supabase.from('periods').select('id').eq('teacher_id', session.id).neq('id', period.id);
   const otherIds = (otherPeriods ?? []).map(p => p.id);
-  const { data: otherLessons } = otherIds.length
-    ? await supabase.from('lessons').select('student_id,date').eq('status', 'active').in('period_id', otherIds)
-    : { data: [] as { student_id: string; date: string }[] };
+  const otherLessons: { id: string; student_id: string; date: string }[] = [];
+  if (otherIds.length) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('lessons').select('id,student_id,date')
+        .eq('status', 'active').in('period_id', otherIds)
+        .gte('date', ymFrom(ym)).lte('date', ymEnd(ym))
+        .order('id').range(from, from + 999);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      otherLessons.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+  }
 
   const scheduleStart = today() > ymFrom(ym) ? addDays(weekStartOf(today()), 7) : ymFrom(ym);
   const teacherAvailability = rowsToSlotSet(teacherSlots ?? []);
@@ -65,7 +90,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
     students: schedStudents,
     studentAvailability,
     teacherAvailability,
-    otherPeriodLessons: (otherLessons ?? []).map(l => ({ studentId: l.student_id, date: l.date })),
+    otherPeriodLessons: otherLessons.map(l => ({ studentId: l.student_id, date: l.date })),
     existingLessons: [],
   });
 
