@@ -28,12 +28,15 @@ const L = LESSON_MINUTES;
 const WD = '日一二三四五六';
 // 月份旁邊那顆狀態小標籤：draft／approved／notified 對學生來說都是「已經排好、不能再編輯」，
 // 不需要細分成三種文字；收集中則帶上目前幾位已填寫／總共幾位，一眼看出進度。
-function periodPillLabel(status: PeriodState['status'], filledCount: number, totalStudents: number): string {
+function periodPillLabel(status: PeriodState['status'], filledCount: number, totalStudents: number, lessonCount: number, unassignedCount: number): string {
   // upcoming（還沒建過 row）跟 closed（row 在了、開關沒開）對學生來說是同一件事：還看不到、不能填，
   // 不需要在這顆標籤上特別分開講，開關本身的狀態已經夠清楚了。
   if (status === 'upcoming' || status === 'closed') return '尚未開放';
   if (status === 'collecting') return `收集中（${filledCount}/${totalStudents}）`;
-  return '完成排課不開放';
+  if (lessonCount === 0 && unassignedCount > 0) return `待安排（${unassignedCount}）`;
+  if (lessonCount === 0) return '尚未排入課程';
+  if (unassignedCount > 0) return `已排 ${lessonCount} 堂・待補 ${unassignedCount}`;
+  return `完成排課・${lessonCount} 堂`;
 }
 
 const isBlockedGlobal = (d: string, s: number) => weekday(d) === 3 && s >= parseHM('16:00') && s < parseHM('17:00');
@@ -974,7 +977,7 @@ export default function TeacherPage() {
     {/* ---- 月份列 ---- */}
     <div className="wnav">
       <button type="button" aria-label="上個月" disabled={ymKeys.indexOf(curYm) === 0} onClick={() => { selectMonth(ymKeys[ymKeys.indexOf(curYm) - 1]); setNotice(''); }}>‹</button>
-      <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, eligibleStudents.length)}</span></b>
+      <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, eligibleStudents.length, period.lessons.length, period.unassigned.length)}</span></b>
       <button type="button" aria-label="下個月"
         onClick={() => {
           setNotice('');
@@ -1183,7 +1186,14 @@ export default function TeacherPage() {
           <div className={`plan-section${planSection === 'confirm' ? ' open' : ''}`}><div className="plan-section-inner">
           {
             !period.lessons.length && !period.unassigned.length ? (
-              <p className="hint">按「自動排課」後，這裡會列出課表。</p>
+              <div className="card">
+                <p className="hint">{period.status === 'draft' || period.status === 'approved' || period.status === 'notified'
+                  ? '這次沒有排入任何課程，請重新排課後再確認學生與老師的可上課時段。'
+                  : '按「自動排課」後，這裡會列出課表。'}</p>
+                {(period.status === 'draft' || period.status === 'approved' || period.status === 'notified') && (
+                  <button className="btn outline" style={{ width: '100%' }} onClick={requestReschedule}>重新排課</button>
+                )}
+              </div>
             ) : (<>
               <LessonList lessons={period.lessons} studentName={studentName}
                 onChangeTime={l => setSheet({ mode: 'time', lessonId: l.id, key: '', customDate: '', customStart: '', error: '' })}
