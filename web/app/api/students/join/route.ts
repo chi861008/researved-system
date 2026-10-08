@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const verified = typeof idToken === 'string' ? await verifyLineIdToken(idToken) : null;
   if (!verified) return NextResponse.json({ error: '無法確認你的 LINE 身分，請重新打開連結。' }, { status: 401 });
 
-  const { data: existing } = await supabase.from('students').select('id,name,weekly_pattern,lesson_credits').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
+  const { data: existing } = await supabase.from('students').select('id,name,weekly_pattern,lesson_credits,scheduling_paused').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
   if (existing) {
     const { count: usedCredits } = await supabase.from('lessons').select('id', { count: 'exact', head: true })
       .eq('student_id', existing.id).eq('status', 'active');
@@ -34,13 +34,13 @@ export async function POST(req: Request) {
         .gte('date', ymFrom(period.ym)).lte('date', ymEnd(period.ym));
       existingAvailability = (slotRows ?? []).map(r => slotKey(r.date, r.start_min));
     }
-    return NextResponse.json({ id: existing.id, name: existing.name, weeklyPattern: existing.weekly_pattern ?? null, existingAvailability, remainingLessons });
+    return NextResponse.json({ id: existing.id, name: existing.name, weeklyPattern: existing.weekly_pattern ?? null, existingAvailability, remainingLessons, paused: Boolean(existing.scheduling_paused) });
   }
 
   // 老師先建立好的學生用個人 token 綁定。成功後立刻清掉 token，連結即使被轉傳也不能再綁第二個人。
   if (typeof inviteToken === 'string' && inviteToken) {
     const { data: invited } = await supabase.from('students')
-      .select('id,name,weekly_pattern,lesson_credits,line_user_id')
+      .select('id,name,weekly_pattern,lesson_credits,line_user_id,scheduling_paused')
       .eq('teacher_id', teacherId).eq('invite_token', inviteToken).maybeSingle();
     if (!invited || invited.line_user_id) return NextResponse.json({ error: '這個加入連結無效或已經使用過，請向老師索取新的連結。' }, { status: 404 });
 
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
         .gte('date', ymFrom(period.ym)).lte('date', ymEnd(period.ym));
       existingAvailability = (slotRows ?? []).map(r => slotKey(r.date, r.start_min));
     }
-    return NextResponse.json({ id: invited.id, name: invited.name, weeklyPattern: invited.weekly_pattern ?? null, existingAvailability, remainingLessons });
+    return NextResponse.json({ id: invited.id, name: invited.name, weeklyPattern: invited.weekly_pattern ?? null, existingAvailability, remainingLessons, paused: Boolean(invited.scheduling_paused) });
   }
 
   const nm = typeof name === 'string' ? name.trim() : '';

@@ -225,6 +225,13 @@ export default function Page() {
       : <JoinView teacherId={resolved.id} teacherName={resolved.name} onJoined={setJoined} />;
   }
 
+  if (resolved.isReal && joined.paused) {
+    return (<main>
+      <h1>🌸 {teacherName} 的{courseName}課程</h1>
+      <div className="card"><b>目前已暫停排課</b><p className="m">你的堂數與資料都會保留；需要恢復上課時，請聯絡 {teacherName} 老師。</p></div>
+    </main>);
+  }
+
   if (resolved.isReal && realPeriod && joined.remainingLessons === 0) {
     return (<main>
       <h1>🌸 {teacherName} 的{courseName}課程</h1>

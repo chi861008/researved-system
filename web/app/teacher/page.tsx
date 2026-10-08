@@ -314,11 +314,13 @@ export default function TeacherPage() {
   const [newStudentLessons, setNewStudentLessons] = useState('8');
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [addStudentBusy, setAddStudentBusy] = useState(false);
+  const [newInviteStudent, setNewInviteStudent] = useState<DemoStudent | null>(null);
   const [creditStudentId, setCreditStudentId] = useState<string | null>(null);
   const [creditMode, setCreditMode] = useState<'set' | 'add'>('set');
   const [creditInput, setCreditInput] = useState('');
   const [creditSaving, setCreditSaving] = useState(false);
   const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
+  const [pauseBusyId, setPauseBusyId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [blockForm, setBlockForm] = useState({ weekday: '3', start: '960', end: '1020' });
@@ -636,7 +638,8 @@ export default function TeacherPage() {
       setNewStudentName('');
       setNewStudentLessons('8');
       setAddStudentOpen(false);
-      setNotice(`已新增 ${nm}。請在學生管理複製他的個人加入連結。`);
+      if (realSession && student.inviteToken) setNewInviteStudent(student);
+      setNotice(`已新增 ${nm}。`);
     } finally { setAddStudentBusy(false); }
   }
   function openCredits(student: DemoStudent, mode: 'set' | 'add' = 'set') {
@@ -689,6 +692,25 @@ export default function TeacherPage() {
       setNotice(`已替 ${student.name} 產生個人加入連結。`);
     } finally { setInviteBusyId(null); }
   }
+  async function toggleStudentPaused(student: DemoStudent) {
+    if (pauseBusyId) return;
+    const paused = !student.paused;
+    setPauseBusyId(student.id);
+    try {
+      if (realSession) {
+        const res = await fetch(`/api/teacher/students/${student.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setNotice(data?.error || '更新失敗，請稍後再試。'); return; }
+      }
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, paused } : s));
+      const alreadyScheduled = period.lessons.some(l => l.studentId === student.id);
+      setNotice(paused
+        ? `已暫停 ${student.name} 的後續排課，堂數與資料都會保留。${alreadyScheduled ? '目前已排好的課不會自動刪除，如需移除請重新排課。' : ''}`
+        : `已恢復 ${student.name} 的排課。`);
+    } finally { setPauseBusyId(null); }
+  }
   async function deleteStudent(id: string) {
     if (pendingDeleteId !== id) { setPendingDeleteId(id); setNotice(`確定要刪除 ${studentName(id)} 嗎？所有已選時段與課表紀錄都會一併刪除、無法復原。如果要重新收這位學生，之後可以重新登錄。再按一次「確認刪除」才會真的刪除。`); return; }
     setDeletingId(id);
@@ -713,7 +735,7 @@ export default function TeacherPage() {
   }
 
   // ---------- 排課 ----------
-  const eligibleStudents = students.filter(s => (s.remainingLessons ?? 0) > 0);
+  const eligibleStudents = students.filter(s => !s.paused && (s.remainingLessons ?? 0) > 0);
   const filledCount = eligibleStudents.filter(filled).length;
   // 只要還有人沒填寫，就不能排課，避免排到一半又要重排
   const allFilled = eligibleStudents.length > 0 && filledCount === eligibleStudents.length;
@@ -790,7 +812,7 @@ export default function TeacherPage() {
     const otherPeriodLessons = Object.entries(periods).filter(([y]) => y !== curYm).flatMap(([, p]) => p.lessons.map(l => ({ studentId: l.studentId, date: l.date })));
     const res = runScheduling({
       from: ymFrom(curYm), to: ymEnd(curYm), scheduleStart, lessonMinutes: L, starts: STARTS,
-      students,
+      students: eligibleStudents,
       studentAvailability, teacherAvailability, otherPeriodLessons,
       existingLessons: [],
     });
@@ -1101,7 +1123,7 @@ export default function TeacherPage() {
           <div className={`plan-section${planSection === 'schedule' ? ' open' : ''}`}><div className="plan-section-inner">
             <div className="card">
               <b>{+curYm.slice(5)} 月填寫狀況　<span className={allFilled ? '' : 'warn'}>{filledCount}/{eligibleStudents.length}</span></b>
-              {students.map(st => (
+              {students.filter(st => !st.paused).map(st => (
                 <div className="li" key={st.id}>
                   <span>{st.name}{proxy[`${st.id}|${curYm}`] && <span className="pillt" style={{ marginLeft: 6 }}>老師代填</span>}<br />
                     <span className={(st.remainingLessons ?? 0) === 0 ? 'warn' : 'm'}>{(st.remainingLessons ?? 0) === 0 ? '0 堂・待續課' : `剩餘 ${st.remainingLessons} 堂`}</span>
@@ -1116,7 +1138,7 @@ export default function TeacherPage() {
               {!allFilled && eligibleStudents.length > 0 && (
                 <p className="hint" style={{ marginTop: 8 }}>還有 {eligibleStudents.length - filledCount} 位有剩餘堂數的學生沒填寫，全部填完才能自動排課。</p>
               )}
-              {eligibleStudents.length === 0 && <p className="warn" style={{ marginTop: 8 }}>目前沒有可排課的學生，請先替學生設定續課堂數。</p>}
+              {eligibleStudents.length === 0 && <p className="warn" style={{ marginTop: 8 }}>目前沒有可排課的學生，請到學生管理確認堂數或恢復排課。</p>}
               {allFilled && !hasTeacherHours && (
                 <p className="warn" style={{ marginTop: 8 }}>這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。</p>
               )}
@@ -1213,7 +1235,7 @@ export default function TeacherPage() {
             period.status !== 'approved' && period.status !== 'notified' ? (
               <p className="hint">確認課表後，這裡會列出每位學生的通知文字。</p>
             ) : (<>
-              {students.map(s => {
+              {students.filter(s => !s.paused || period.lessons.some(l => l.studentId === s.id)).map(s => {
                 const ls = period.lessons.filter(l => l.studentId === s.id);
                 const n = needsTeacher.filter(u => u.studentId === s.id).length;
                 const deferred = deferredWeeks.filter(u => u.studentId === s.id);
@@ -1258,21 +1280,21 @@ export default function TeacherPage() {
             return (
               <div className="card" key={st.id}>
                 <div className="li" style={{ paddingTop: 0 }}>
-                  <span><b>{st.name}</b><br /><span className="m">剩餘 {st.remainingLessons ?? 0} 堂</span></span>
+                  <span><b>{st.name}</b>{st.paused && <span className="pillt" style={{ marginLeft: 6 }}>暫停排課</span>}<br /><span className="m">剩餘 {st.remainingLessons ?? 0} 堂</span></span>
                   <span className={st.linked ? '' : 'warn'}>{st.linked ? '已加入 LINE' : realSession ? '待加入' : '展示學生'}</span>
                 </div>
                 <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
                   <button className="btn" onClick={() => openCredits(st, 'add')}>增加堂數</button>
                   <button className="btn" onClick={() => openCredits(st, 'set')}>調整餘額</button>
+                  <button className="btn" disabled={pauseBusyId === st.id} onClick={() => toggleStudentPaused(st)}>
+                    {pauseBusyId === st.id ? '處理中…' : st.paused ? '恢復排課' : '暫停排課'}
+                  </button>
                 </div>
                 {realSession && !st.linked && (
                   <div style={{ marginTop: 10 }}>
                     {link ? <>
                       <p className="hint" style={{ marginBottom: 4 }}>這是 {st.name} 專用的一次性加入連結，請只傳給本人。</p>
                       <CopyBtn text={`${st.name} 你好 🌸\n請用 LINE 開啟這個連結加入課程：\n${link}`} style={{ width: '100%' }} />
-                      <button className="btn outline" style={{ width: '100%', marginTop: 6 }} disabled={inviteBusyId === st.id} onClick={() => generateInvite(st)}>
-                        {inviteBusyId === st.id ? '產生中…' : '讓舊連結失效並重新產生'}
-                      </button>
                     </> : (
                       <button className="btn" style={{ width: '100%' }} disabled={inviteBusyId === st.id} onClick={() => generateInvite(st)}>
                         {inviteBusyId === st.id ? '產生中…' : '產生個人加入連結'}
@@ -1358,6 +1380,20 @@ export default function TeacherPage() {
         <input className="tin" type="number" min="0" step="1" inputMode="numeric" value={newStudentLessons}
           onChange={e => setNewStudentLessons(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addStudent(); }} />
         <button className="btn pri" style={{ width: '100%', marginTop: 12 }} disabled={addStudentBusy} onClick={addStudent}>{addStudentBusy ? '新增中…' : '新增學生'}</button>
+      </div>
+    </>)}
+
+    {/* ---- 新增學生完成：立刻詢問是否把個人加入連結傳給學生 ---- */}
+    {newInviteStudent && personalInviteLink(newInviteStudent) && (<>
+      <div className="ov" onClick={() => setNewInviteStudent(null)} />
+      <div className="sheet" role="dialog" aria-label="分享學生加入連結">
+        <b>已新增 {newInviteStudent.name}</b>
+        <p className="hint">要現在把個人加入連結傳給學生嗎？學生用 LINE 開啟後，就會綁定你剛建立的姓名與堂數。</p>
+        <CopyBtn
+          text={`${newInviteStudent.name} 你好 🌸\n請用 LINE 開啟這個連結加入課程：\n${personalInviteLink(newInviteStudent)}`}
+          style={{ width: '100%', minHeight: 50, marginTop: 6 }}
+        />
+        <button className="btn outline" style={{ width: '100%', marginTop: 8 }} onClick={() => setNewInviteStudent(null)}>稍後再分享</button>
       </div>
     </>)}
 

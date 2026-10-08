@@ -18,11 +18,12 @@ create table students (
   teacher_id uuid not null references teachers,   -- 學生屬於哪位老師；老師之間互相看不到對方的學生
   name text not null,
   lesson_credits int not null default 0 check (lesson_credits >= 0), -- 累計購買堂數；剩餘＝此值－active lessons
+  scheduling_paused boolean not null default false, -- 暫停時保留堂數與資料，但不參與排課／提醒
   invite_token text unique,       -- 老師先建學生後的一次性個人加入連結；綁定成功即清空
   line_user_id text unique,        -- 來自 LIFF（須與官方帳號同一 Provider）
   line_group_id text,              -- 該學生的 LINE 群組（目前通知改以「分享到 LINE」為主，群組非必要）
   consent_at timestamptz
-  -- 沒有 hidden 欄位：不需要的學生直接刪除整列，不保留歷史，要重收就重新登錄。
+  -- 不需要的學生可直接刪除；只是暫時休息則使用 scheduling_paused 保留資料。
 );
 create table line_groups (         -- 官方帳號被邀請進的群組；未綁定者出現在「尚未綁定的群組」清單
   group_id text primary key, name text,

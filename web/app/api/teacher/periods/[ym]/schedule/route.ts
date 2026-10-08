@@ -21,7 +21,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
   if (period.status !== 'collecting') return NextResponse.json({ error: '這個月已經排過課；如需重排，請先按「重新排課」。' }, { status: 409 });
 
   const [{ data: students }, { data: teacherSlots }] = await Promise.all([
-    supabase.from('students').select('id,name,lesson_credits').eq('teacher_id', session.id),
+    supabase.from('students').select('id,name,lesson_credits').eq('teacher_id', session.id).eq('scheduling_paused', false),
     // 只看目前排課月份。老師其他月份即使有上班時段，也不能讓這個完全空白的月份通過排課檢查。
     supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id)
       .gte('date', ymFrom(ym)).lte('date', ymEnd(ym)),

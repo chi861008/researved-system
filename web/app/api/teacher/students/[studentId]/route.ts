@@ -14,6 +14,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ studen
   const { data: student } = await supabase.from('students').select('id,lesson_credits,line_user_id').eq('id', studentId).eq('teacher_id', session.id).maybeSingle();
   if (!student) return NextResponse.json({ error: '找不到這位學生' }, { status: 404 });
 
+  if (typeof body.paused === 'boolean') {
+    const { error } = await supabase.from('students').update({ scheduling_paused: body.paused }).eq('id', studentId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, paused: body.paused });
+  }
+
   if (body.regenerateInvite === true) {
     if (student.line_user_id) return NextResponse.json({ error: '這位學生已經綁定 LINE，不需要加入連結。' }, { status: 409 });
     const inviteToken = randomBytes(24).toString('base64url');

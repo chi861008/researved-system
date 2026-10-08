@@ -15,7 +15,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
 
   const [{ data: students }, { data: teacherSlots }, { data: weeklyBlockRow }, { data: periods }, { data: substituteNames }, { data: teacherRow }] = await Promise.all([
-    supabase.from('students').select('id,name,lesson_credits,line_user_id,invite_token').eq('teacher_id', session.id),
+    supabase.from('students').select('id,name,lesson_credits,line_user_id,invite_token,scheduling_paused').eq('teacher_id', session.id),
     supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id),
     supabase.from('weekly_blocks').select('weekday,start_min,end_min').eq('teacher_id', session.id).limit(1).maybeSingle(),
     supabase.from('periods').select('id,ym,status').eq('teacher_id', session.id),
@@ -66,6 +66,7 @@ export async function GET() {
     remainingLessons: Math.max(0, (s.lesson_credits ?? 0) - (activeLessonCount.get(s.id) ?? 0)),
     linked: Boolean(s.line_user_id),
     inviteToken: s.invite_token ?? undefined,
+    paused: Boolean(s.scheduling_paused),
   }));
 
   // proxy：這位學生「這個月」有沒有任一筆時段是老師代填的（slots.filled_by_teacher），有就顯示「老師代填」

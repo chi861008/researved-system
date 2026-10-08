@@ -9,6 +9,7 @@ export interface DemoStudent {
   remainingLessons?: number;
   linked?: boolean;
   inviteToken?: string;
+  paused?: boolean;
 }
 export interface DemoTeacher { id: string; name: string }
 
