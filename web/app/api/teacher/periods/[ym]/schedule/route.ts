@@ -18,9 +18,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
 
   const { data: period } = await supabase.from('periods').select('id,status').eq('teacher_id', session.id).eq('ym', ym).maybeSingle();
   if (!period) return NextResponse.json({ error: '這個月還沒開放選課' }, { status: 404 });
+  if (period.status !== 'collecting') return NextResponse.json({ error: '這個月已經排過課；如需重排，請先按「重新排課」。' }, { status: 409 });
 
   const [{ data: students }, { data: teacherSlots }] = await Promise.all([
-    supabase.from('students').select('id,name').eq('teacher_id', session.id),
+    supabase.from('students').select('id,name,lesson_credits').eq('teacher_id', session.id),
     // 只看目前排課月份。老師其他月份即使有上班時段，也不能讓這個完全空白的月份通過排課檢查。
     supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id)
       .gte('date', ymFrom(ym)).lte('date', ymEnd(ym)),
@@ -30,6 +31,17 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
   if (!teacherSlots?.length) return NextResponse.json({ error: '這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。' }, { status: 409 });
 
   const studentIds = (students ?? []).map(s => s.id);
+  const { data: activeCreditLessons } = studentIds.length
+    ? await supabase.from('lessons').select('student_id').eq('teacher_id', session.id).eq('status', 'active').in('student_id', studentIds)
+    : { data: [] as { student_id: string }[] };
+  const usedCredits = new Map<string, number>();
+  for (const l of activeCreditLessons ?? []) usedCredits.set(l.student_id, (usedCredits.get(l.student_id) ?? 0) + 1);
+  const remainingBefore = new Map<string, number>();
+  const schedStudents = (students ?? []).map(s => {
+    const remainingLessons = Math.max(0, (s.lesson_credits ?? 0) - (usedCredits.get(s.id) ?? 0));
+    remainingBefore.set(s.id, remainingLessons);
+    return { id: s.id, name: s.name, remainingLessons };
+  });
   const { data: studentSlotRows } = studentIds.length
     ? await supabase.from('slots').select('owner_id,date,start_min').eq('owner_type', 'student').in('owner_id', studentIds)
     : { data: [] as { owner_id: string; date: string; start_min: number }[] };
@@ -46,7 +58,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
   const scheduleStart = today() > ymFrom(ym) ? addDays(weekStartOf(today()), 7) : ymFrom(ym);
   const result = runScheduling({
     from: ymFrom(ym), to: ymEnd(ym), scheduleStart, lessonMinutes: LESSON_MINUTES, starts: STUDIO_STARTS,
-    students: students ?? [],
+    students: schedStudents,
     studentAvailability,
     teacherAvailability: rowsToSlotSet(teacherSlots ?? []),
     otherPeriodLessons: (otherLessons ?? []).map(l => ({ studentId: l.student_id, date: l.date })),
@@ -74,5 +86,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
     const weekDates = datesBetween(u.week_start, addDays(u.week_start, 6));
     return { id: u.id, studentId: u.student_id, weekStart: u.week_start, reason: u.reason, windows: windowList(sel, weekDates, STUDIO_STARTS, LESSON_MINUTES) };
   });
-  return NextResponse.json({ lessons: lessonsOut, unassigned: unassignedOut });
+  const scheduledCount = new Map<string, number>();
+  for (const l of result.lessons) scheduledCount.set(l.studentId, (scheduledCount.get(l.studentId) ?? 0) + 1);
+  const remainingLessons = Object.fromEntries(schedStudents.map(s => [
+    s.id,
+    Math.max(0, (remainingBefore.get(s.id) ?? 0) - (scheduledCount.get(s.id) ?? 0)),
+  ]));
+  return NextResponse.json({ lessons: lessonsOut, unassigned: unassignedOut, remainingLessons });
 }

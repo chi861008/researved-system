@@ -17,16 +17,20 @@ export async function POST(req: Request) {
   const verified = typeof idToken === 'string' ? await verifyLineIdToken(idToken) : null;
   if (!verified) return NextResponse.json({ error: '無法確認你的 LINE 身分，請重新打開連結。' }, { status: 401 });
 
-  const { data: student } = await supabase.from('students').select('id').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
+  const { data: student } = await supabase.from('students').select('id,lesson_credits').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
   if (!student) return NextResponse.json({ error: '請先透過邀請連結加入。' }, { status: 404 });
 
+  const { count: usedCredits } = await supabase.from('lessons').select('id', { count: 'exact', head: true })
+    .eq('student_id', student.id).eq('status', 'active');
+  const remainingLessons = Math.max(0, (student.lesson_credits ?? 0) - (usedCredits ?? 0));
+
   const { data: period } = await supabase.from('periods').select('id,ym,status').eq('teacher_id', teacherId).neq('status', 'collecting').order('ym', { ascending: false }).limit(1).maybeSingle();
-  if (!period) return NextResponse.json({ noSchedule: true });
+  if (!period) return NextResponse.json({ noSchedule: true, remainingLessons });
 
   const { data: lessons } = await supabase.from('lessons').select('id,date,start_min,teacher_name,checked_in_at')
     .eq('period_id', period.id).eq('student_id', student.id).eq('status', 'active').order('date').order('start_min');
   return NextResponse.json({
-    ym: period.ym, status: period.status,
+    ym: period.ym, status: period.status, remainingLessons,
     lessons: (lessons ?? []).map(l => ({ id: l.id, date: l.date, start: l.start_min, teacherName: l.teacher_name ?? undefined, checkedInAt: l.checked_in_at ?? undefined })),
   });
 }

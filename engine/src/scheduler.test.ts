@@ -148,6 +148,28 @@ const monthDates = allDays(FROM, TO);
   check(!pass2.lessons.some(l => l.studentId === 'a'), '第二批結果不應該包含 A（A 已經在第一批排定，不會被重排）');
 }
 
+// ========== 3c. 堂數限制：排滿後停止，不再產生多餘待補 ==========
+{
+  const dates = allDays('2026-11-02', '2026-11-29');
+  const everySlot = weeklyPatternSet(dates, [1, 2, 3, 4, 5, 6, 0], '10:00', '11:00');
+  const studentAvailability = new Map<string, Set<string>>([
+    ['two', new Set(everySlot)],
+    ['zero', new Set(everySlot)],
+  ]);
+  const res = runScheduling({
+    from: '2026-11-02', to: '2026-11-29', scheduleStart: '2026-11-02', lessonMinutes: 60, starts: [600],
+    students: [
+      { id: 'two', name: '兩堂', remainingLessons: 2 },
+      { id: 'zero', name: '零堂', remainingLessons: 0 },
+    ],
+    studentAvailability, teacherAvailability: everySlot, otherPeriodLessons: [],
+  });
+  check(res.lessons.filter(l => l.studentId === 'two').length === 2, '剩兩堂的學生只能排兩堂');
+  check(!res.lessons.some(l => l.studentId === 'zero'), '零堂學生不能排課');
+  check(!res.unassigned.some(u => u.studentId === 'zero'), '零堂學生不應產生待補紀錄');
+  check(!res.unassigned.some(u => u.studentId === 'two'), '堂數排滿後不應留下多餘待補紀錄');
+}
+
 // ========== 4. analyzeWeeklyPattern：週間規律、休假、例外調整 ==========
 {
   const dates = allDays('2026-10-01', '2026-10-31'); // 10/1 是週四

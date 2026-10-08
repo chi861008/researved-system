@@ -15,7 +15,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
 
   const [{ data: students }, { data: teacherSlots }, { data: weeklyBlockRow }, { data: periods }, { data: substituteNames }, { data: teacherRow }] = await Promise.all([
-    supabase.from('students').select('id,name').eq('teacher_id', session.id),
+    supabase.from('students').select('id,name,lesson_credits').eq('teacher_id', session.id),
     supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id),
     supabase.from('weekly_blocks').select('weekday,start_min,end_min').eq('teacher_id', session.id).limit(1).maybeSingle(),
     supabase.from('periods').select('id,ym,status').eq('teacher_id', session.id),
@@ -58,6 +58,14 @@ export async function GET() {
     (periodsOut[ym].unassigned as unknown[]).push({ id: u.id, studentId: u.student_id, weekStart: u.week_start, reason: u.reason, windows });
   }
 
+  const activeLessonCount = new Map<string, number>();
+  for (const l of lessons ?? []) activeLessonCount.set(l.student_id, (activeLessonCount.get(l.student_id) ?? 0) + 1);
+  const studentsOut = (students ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    remainingLessons: Math.max(0, (s.lesson_credits ?? 0) - (activeLessonCount.get(s.id) ?? 0)),
+  }));
+
   // proxy：這位學生「這個月」有沒有任一筆時段是老師代填的（slots.filled_by_teacher），有就顯示「老師代填」
   const proxy: Record<string, boolean> = {};
   for (const p of periods ?? []) {
@@ -77,7 +85,7 @@ export async function GET() {
     hoursPrefix: teacherRow?.hours_prefix || '',
     hoursSuffix: teacherRow?.hours_suffix || '',
     weeklyPattern: teacherRow?.weekly_pattern ?? null,
-    students: students ?? [],
+    students: studentsOut,
     studentAvailability,
     teacherAvailability: [...rowsToSlotSet(teacherSlots ?? [])],
     names: (substituteNames ?? []).map(n => n.name),

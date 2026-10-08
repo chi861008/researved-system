@@ -295,8 +295,12 @@ export default function TeacherPage() {
   }
 
   const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentLessons, setNewStudentLessons] = useState('8');
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [addStudentBusy, setAddStudentBusy] = useState(false);
+  const [creditStudentId, setCreditStudentId] = useState<string | null>(null);
+  const [creditInput, setCreditInput] = useState('');
+  const [creditSaving, setCreditSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [blockForm, setBlockForm] = useState({ weekday: '3', start: '960', end: '1020' });
@@ -352,7 +356,7 @@ export default function TeacherPage() {
         const cur = prev[teacherId];
         if (!cur) return prev;
         const existingIds = new Set(cur.students.map(s => s.id));
-        const toAdd = joined.filter(j => !existingIds.has(j.id));
+        const toAdd = joined.filter(j => !existingIds.has(j.id)).map(j => ({ ...j, remainingLessons: j.remainingLessons ?? 0 }));
         // 學生送出的時段存在另一組 localStorage key（見 saveDemoSubmittedAvailability），每次都要
         // 重新比對一次，不是只有「剛加入」的學生才需要——已經在名單裡的學生之後才送出，也要能看到。
         const nextAvail = new Map(cur.studentAvailability);
@@ -593,26 +597,52 @@ export default function TeacherPage() {
   // ---------- 學生 ----------
   async function addStudent() {
     const nm = newStudentName.trim();
+    const remainingLessons = newStudentLessons.trim() === '' ? NaN : Number(newStudentLessons);
     if (!nm) { setNotice('請輸入學生名稱。'); return; }
+    if (!Number.isInteger(remainingLessons) || remainingLessons < 0) { setNotice('堂數必須是 0 以上的整數。'); return; }
     const ex = students.find(s => s.name === nm);
     if (ex) { setNotice(`${nm} 已經在名單裡。`); return; }
     setAddStudentBusy(true);
     try {
       let id: string;
       if (realSession) {
-        const res = await fetch('/api/teacher/students', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm }) });
+        const res = await fetch('/api/teacher/students', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm, remainingLessons }) });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) { setNotice(data?.error || '新增失敗，請稍後再試。'); return; }
         id = data.id;
       } else {
         id = `s${students.length + 1}_${Date.now()}`;
       }
-      setStudents(prev => [...prev, { id, name: nm }]);
+      setStudents(prev => [...prev, { id, name: nm, remainingLessons }]);
       setStudentAvailability(prev => { const m = new Map(prev); m.set(id, new Set()); return m; });
       setNewStudentName('');
+      setNewStudentLessons('8');
       setAddStudentOpen(false);
       setNotice(`已新增 ${nm}。可以按「幫他填」先填寫上課時間。`);
     } finally { setAddStudentBusy(false); }
+  }
+  function openCredits(student: DemoStudent) {
+    setCreditStudentId(student.id);
+    setCreditInput(String(student.remainingLessons ?? 0));
+  }
+  async function saveCredits() {
+    if (!creditStudentId || creditSaving) return;
+    const remainingLessons = creditInput.trim() === '' ? NaN : Number(creditInput);
+    if (!Number.isInteger(remainingLessons) || remainingLessons < 0) { setNotice('堂數必須是 0 以上的整數。'); return; }
+    setCreditSaving(true);
+    try {
+      if (realSession) {
+        const res = await fetch(`/api/teacher/students/${creditStudentId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ remainingLessons }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setNotice(data?.error || '更新堂數失敗，請稍後再試。'); return; }
+      }
+      const nm = studentName(creditStudentId);
+      setStudents(prev => prev.map(s => s.id === creditStudentId ? { ...s, remainingLessons } : s));
+      setCreditStudentId(null);
+      setNotice(`已將 ${nm} 的剩餘堂數設為 ${remainingLessons} 堂。`);
+    } finally { setCreditSaving(false); }
   }
   async function deleteStudent(id: string) {
     if (pendingDeleteId !== id) { setPendingDeleteId(id); setNotice(`確定要刪除 ${studentName(id)} 嗎？所有已選時段與課表紀錄都會一併刪除、無法復原。如果要重新收這位學生，之後可以重新登錄。再按一次「確認刪除」才會真的刪除。`); return; }
@@ -631,16 +661,17 @@ export default function TeacherPage() {
     } finally { setDeletingId(null); }
   }
   function remind() {
-    const nf = students.filter(st => !filled(st));
+    const nf = eligibleStudents.filter(st => !filled(st));
     const entries: LogEntry[] = nf.map(st => ({ kind: 'remind', time: nowStr(), studentId: st.id, text: `${st.name} 你好 🌸 ${+curYm.slice(5)} 月的選課還沒收到你的時段喔，麻煩點選下方按鈕填寫，謝謝！🫶🏻` }));
     updatePeriod(curYm, { log: [...entries, ...period.log] });
     setNotice(`已提醒 ${nf.length} 位尚未填寫的學生。`);
   }
 
   // ---------- 排課 ----------
-  const filledCount = students.filter(filled).length;
+  const eligibleStudents = students.filter(s => (s.remainingLessons ?? 0) > 0);
+  const filledCount = eligibleStudents.filter(filled).length;
   // 只要還有人沒填寫，就不能排課，避免排到一半又要重排
-  const allFilled = students.length > 0 && filledCount === students.length;
+  const allFilled = eligibleStudents.length > 0 && filledCount === eligibleStudents.length;
   const hasExistingSchedule = period.lessons.length > 0 || period.unassigned.length > 0;
 
   // 「自動排課／確認課表／發送訊息」其實是同一個長頁面，這三個分頁只是錨點：
@@ -690,6 +721,9 @@ export default function TeacherPage() {
           return;
         }
       }
+      const restoredByStudent = new Map<string, number>();
+      for (const l of period.lessons) restoredByStudent.set(l.studentId, (restoredByStudent.get(l.studentId) ?? 0) + 1);
+      setStudents(prev => prev.map(s => ({ ...s, remainingLessons: (s.remainingLessons ?? 0) + (restoredByStudent.get(s.id) ?? 0) })));
       updatePeriod(curYm, { lessons: [], unassigned: [], status: 'collecting', notified: false });
       syncDemoPeriodStatus(curYm, 'collecting');
       setNotice('已清除課表，恢復成收集中。調整好學生名單或上班時段後，再按「自動排課」重新排一次。');
@@ -702,6 +736,7 @@ export default function TeacherPage() {
       const res = await fetch(`/api/teacher/periods/${curYm}/schedule`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setNotice(data?.error || '排課失敗，請稍後再試。'); return false; }
+      if (data.remainingLessons) setStudents(prev => prev.map(s => ({ ...s, remainingLessons: data.remainingLessons[s.id] ?? s.remainingLessons ?? 0 })));
       updatePeriod(curYm, { lessons: data.lessons, unassigned: data.unassigned, status: 'draft', notified: false });
       setNotice('');
       return true;
@@ -716,6 +751,9 @@ export default function TeacherPage() {
     });
     let uid = 1;
     const newLessons: Lesson[] = res.lessons.map(l => ({ id: uid++, studentId: l.studentId, date: l.date, start: l.start }));
+    const scheduledByStudent = new Map<string, number>();
+    for (const l of newLessons) scheduledByStudent.set(l.studentId, (scheduledByStudent.get(l.studentId) ?? 0) + 1);
+    setStudents(prev => prev.map(s => ({ ...s, remainingLessons: Math.max(0, (s.remainingLessons ?? 0) - (scheduledByStudent.get(s.id) ?? 0)) })));
     updatePeriod(curYm, { lessons: newLessons, unassigned: res.unassigned, status: 'draft', notified: false });
     syncDemoPeriodStatus(curYm, 'draft');
     setNotice('');
@@ -869,7 +907,7 @@ export default function TeacherPage() {
     {/* ---- 月份列 ---- */}
     <div className="wnav">
       <button type="button" aria-label="上個月" disabled={ymKeys.indexOf(curYm) === 0} onClick={() => { setCurYm(ymKeys[ymKeys.indexOf(curYm) - 1]); setNotice(''); }}>‹</button>
-      <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, students.length)}</span></b>
+      <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, eligibleStudents.length)}</span></b>
       <button type="button" aria-label="下個月"
         onClick={() => {
           setNotice('');
@@ -1013,24 +1051,28 @@ export default function TeacherPage() {
           <button type="button" id="section-schedule" onClick={() => gotoSection('schedule')}
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', width: '100%', background: 'none', border: 0, padding: '10px 0', fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
             <span style={{ color: planSection === 'schedule' ? 'var(--ink)' : 'var(--muted)' }}>{planSection === 'schedule' ? '▾' : '▸'} 自動排課</span>
-            {planSection !== 'schedule' && <span className="m" style={{ fontWeight: 400 }}>{filledCount}/{students.length} 已填寫</span>}
+            {planSection !== 'schedule' && <span className="m" style={{ fontWeight: 400 }}>{filledCount}/{eligibleStudents.length} 已填寫</span>}
           </button>
           <div className={`plan-section${planSection === 'schedule' ? ' open' : ''}`}><div className="plan-section-inner">
             <div className="card">
-              <b>{+curYm.slice(5)} 月填寫狀況　<span className={allFilled ? '' : 'warn'}>{filledCount}/{students.length}</span></b>
+              <b>{+curYm.slice(5)} 月填寫狀況　<span className={allFilled ? '' : 'warn'}>{filledCount}/{eligibleStudents.length}</span></b>
               {students.map(st => (
                 <div className="li" key={st.id}>
-                  <span>{st.name}{proxy[`${st.id}|${curYm}`] && <span className="pillt" style={{ marginLeft: 6 }}>老師代填</span>}</span>
+                  <span>{st.name}{proxy[`${st.id}|${curYm}`] && <span className="pillt" style={{ marginLeft: 6 }}>老師代填</span>}<br />
+                    <span className={(st.remainingLessons ?? 0) === 0 ? 'warn' : 'm'}>{(st.remainingLessons ?? 0) === 0 ? '0 堂・待續課' : `剩餘 ${st.remainingLessons} 堂`}</span>
+                  </span>
                   <span>
-                    <span className={filled(st) ? '' : 'warn'}>{filled(st) ? '已填寫' : '尚未填寫'}</span>{' '}
-                    <button onClick={() => setActingStudentId(st.id)}>{filled(st) ? '修改' : '幫他填'}</button>{' '}
+                    {(st.remainingLessons ?? 0) > 0 && <><span className={filled(st) ? '' : 'warn'}>{filled(st) ? '已填寫' : '尚未填寫'}</span>{' '}
+                    <button onClick={() => setActingStudentId(st.id)}>{filled(st) ? '修改' : '幫他填'}</button>{' '}</>}
+                    <button onClick={() => openCredits(st)}>{(st.remainingLessons ?? 0) === 0 ? '續課' : '調整堂數'}</button>{' '}
                     <button disabled={deletingId === st.id} onClick={() => deleteStudent(st.id)}>{deletingId === st.id ? '刪除中…' : pendingDeleteId === st.id ? '確認刪除' : '刪除'}</button>
                   </span>
                 </div>
               ))}
-              {!allFilled && students.length > 0 && (
-                <p className="hint" style={{ marginTop: 8 }}>還有 {students.length - filledCount} 位沒填寫，全部填完才能自動排課。</p>
+              {!allFilled && eligibleStudents.length > 0 && (
+                <p className="hint" style={{ marginTop: 8 }}>還有 {eligibleStudents.length - filledCount} 位有剩餘堂數的學生沒填寫，全部填完才能自動排課。</p>
               )}
+              {eligibleStudents.length === 0 && <p className="warn" style={{ marginTop: 8 }}>目前沒有可排課的學生，請先替學生設定續課堂數。</p>}
               {allFilled && !hasTeacherHours && (
                 <p className="warn" style={{ marginTop: 8 }}>這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。</p>
               )}
@@ -1039,10 +1081,10 @@ export default function TeacherPage() {
               </button>
             </div>
 
-            {period.status === 'collecting' && students.some(s => !filled(s)) && (
+            {period.status === 'collecting' && eligibleStudents.some(s => !filled(s)) && (
               <div className="card">
                 <button className="btn" style={{ width: '100%' }} onClick={remind}>
-                  現在就提醒 {students.filter(s => !filled(s)).length} 位未填的學生
+                  現在就提醒 {eligibleStudents.filter(s => !filled(s)).length} 位未填的學生
                 </button>
                 <p className="hint">按鈕會直接記錄為已發送；如果想自己手動貼到 LINE（不占用則數），可以在下面已發出的提醒找複製按鈕、編輯後再傳。</p>
                 {period.log.filter(x => x.kind === 'remind').length > 0 && (<>
@@ -1137,7 +1179,8 @@ export default function TeacherPage() {
                 const text = `${s.name} 你好 🌸\n這是你 ${+curYm.slice(5)} 月的上課時間：\n` +
                   ls.map(l => `${md(l.date)}（${WD[weekday(l.date)]}）${hhmm(l.start)}–${hhmm(l.start + L)}　${l.teacherName || currentTeacherName} 老師`).join('\n') +
                   (n ? `\n另有 ${n} 週的課還在安排授課老師，確定後會再通知你。` : '') +
-                  (deferred.length ? `\n${deferred.map(u => `${md(u.weekStart)} 起這週`).join('、')}沒有可上課時段，這些週先不排課，順延至後續可上課週，仍以每週一堂為原則。` : '');
+                  (deferred.length ? `\n${deferred.map(u => `${md(u.weekStart)} 起這週`).join('、')}沒有可上課時段，這些週先不排課，順延至後續可上課週，仍以每週一堂為原則。` : '') +
+                  ((s.remainingLessons ?? 0) === 0 ? `\n\n🔔 你的堂數已經排完了，如要繼續上課，請聯絡 ${currentTeacherName} 老師續課。` : `\n\n剩餘堂數：${s.remainingLessons ?? 0} 堂`);
                 return (
                   <div className="card" key={s.id}>
                     <b>{s.name}</b> {period.notified && <span className="pillt">已通知</span>}
@@ -1223,7 +1266,25 @@ export default function TeacherPage() {
           <input className="tin" placeholder="學生名稱" autoFocus value={newStudentName}
             onChange={e => setNewStudentName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addStudent(); }} />
-          <button className="btn" style={{ flex: '0 0 auto', padding: '0 18px' }} disabled={addStudentBusy} onClick={addStudent}>{addStudentBusy ? '新增中…' : '新增'}</button>
+        </div>
+        <p className="m" style={{ margin: '10px 0 4px' }}>目前可排堂數</p>
+        <input className="tin" type="number" min="0" step="1" inputMode="numeric" value={newStudentLessons}
+          onChange={e => setNewStudentLessons(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addStudent(); }} />
+        <button className="btn pri" style={{ width: '100%', marginTop: 12 }} disabled={addStudentBusy} onClick={addStudent}>{addStudentBusy ? '新增中…' : '新增學生'}</button>
+      </div>
+    </>)}
+
+    {/* ---- 設定／續課堂數 ---- */}
+    {creditStudentId && (<>
+      <div className="ov" onClick={() => setCreditStudentId(null)} />
+      <div className="sheet" role="dialog" aria-label="設定剩餘堂數">
+        <b>{studentName(creditStudentId)} 的剩餘堂數</b>
+        <p className="hint">填寫從現在開始還能排幾堂。排入課表後會自動扣除；重新排課清除課表時會自動退回。</p>
+        <input className="tin" type="number" min="0" step="1" inputMode="numeric" autoFocus value={creditInput}
+          onChange={e => setCreditInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveCredits(); }} />
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn" disabled={creditSaving} onClick={() => setCreditStudentId(null)}>取消</button>
+          <button className="btn pri" disabled={creditSaving} onClick={saveCredits}>{creditSaving ? '儲存中…' : '儲存堂數'}</button>
         </div>
       </div>
     </>)}

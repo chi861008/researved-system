@@ -17,6 +17,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { date, start, teacherName } = await req.json().catch(() => ({}));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(start)) return NextResponse.json({ error: '資料格式不正確' }, { status: 400 });
 
+  const [{ data: student }, { count: usedCredits }] = await Promise.all([
+    supabase.from('students').select('lesson_credits').eq('id', u.student_id).maybeSingle(),
+    supabase.from('lessons').select('id', { count: 'exact', head: true }).eq('student_id', u.student_id).eq('status', 'active'),
+  ]);
+  if (!student || (student.lesson_credits ?? 0) - (usedCredits ?? 0) <= 0) {
+    return NextResponse.json({ error: '這位學生已沒有剩餘堂數，請先續課再安排。' }, { status: 409 });
+  }
+
   const { data: lesson, error } = await supabase.from('lessons')
     .insert({ teacher_id: session.id, period_id: u.period_id, student_id: u.student_id, date, start_min: start, teacher_name: teacherName || null })
     .select('id,student_id,date,start_min,teacher_name').single();

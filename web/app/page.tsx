@@ -33,7 +33,7 @@ export default function Page() {
   const [noOpenPeriod, setNoOpenPeriod] = useState(false);
   // 真老師模式：排課完成後（noOpenPeriod 代表「不是收集中」，可能是還沒開放、也可能是排完課了），
   // 改查這支「我的課表」API，有課的話顯示卡片畫面，不是籠統顯示「目前沒有開放選課」。
-  const [mySchedule, setMySchedule] = useState<{ ym: string; lessons: ScheduleLesson[] } | null>(null);
+  const [mySchedule, setMySchedule] = useState<{ ym: string; lessons: ScheduleLesson[]; remainingLessons: number } | null>(null);
   // 展示模式：老師完成自動排課後，這個月就不能再編輯了（跟真老師模式靠資料庫 periods.status
   // 是同一個規則，只是展示模式沒有資料庫，額外存一份在 localStorage，見 lib/teacherDemo.ts）。
   const [demoLocked, setDemoLocked] = useState(false);
@@ -132,7 +132,7 @@ export default function Page() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken, teacherId: resolved.id }),
     }).then(r => r.json()).then(data => {
-      if (data.lessons?.length) setMySchedule({ ym: data.ym, lessons: data.lessons });
+      if (data.ym) setMySchedule({ ym: data.ym, lessons: data.lessons ?? [], remainingLessons: data.remainingLessons ?? 0 });
     }).catch(() => {});
   }, [resolved, joined, noOpenPeriod, idToken]);
 
@@ -221,9 +221,16 @@ export default function Page() {
       : <JoinView teacherId={resolved.id} teacherName={resolved.name} onJoined={setJoined} />;
   }
 
+  if (resolved.isReal && realPeriod && joined.remainingLessons === 0) {
+    return (<main>
+      <h1>🌸 {teacherName} 的{courseName}課程</h1>
+      <div className="card"><b>🔔 目前沒有剩餘堂數</b><p className="m">請先聯絡 {teacherName} 老師續課；續課完成後重新開啟連結，就可以繼續選時間。</p></div>
+    </main>);
+  }
+
   if (resolved.isReal && noOpenPeriod) {
     if (mySchedule) {
-      return <MyScheduleView teacherName={teacherName} studentName={joined.name} ym={mySchedule.ym} initialLessons={mySchedule.lessons} idToken={idToken} />;
+      return <MyScheduleView teacherName={teacherName} studentName={joined.name} ym={mySchedule.ym} initialLessons={mySchedule.lessons} remainingLessons={mySchedule.remainingLessons} idToken={idToken} />;
     }
     return (<main>
       <h1>🌸 {teacherName} 的{courseName}課程</h1>
@@ -415,8 +422,8 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
 // 排課完成後（不管是還沒開放還是已經排完課，noOpenPeriod 都會是 true）學生看到的「我的課表」：
 // 每堂課一張卡片，可以請假或上課當天打卡。請假一定要經過老師安排新時間才算數（見
 // app/api/students/lessons/[lessonId]/leave/route.ts 的註解），這裡只負責送出請求、不會自己改時間。
-function MyScheduleView({ teacherName, studentName, ym, initialLessons, idToken }: {
-  teacherName: string; studentName: string; ym: string; initialLessons: ScheduleLesson[]; idToken: string | null;
+function MyScheduleView({ teacherName, studentName, ym, initialLessons, remainingLessons, idToken }: {
+  teacherName: string; studentName: string; ym: string; initialLessons: ScheduleLesson[]; remainingLessons: number; idToken: string | null;
 }) {
   const [lessons, setLessons] = useState(initialLessons);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -460,6 +467,11 @@ function MyScheduleView({ teacherName, studentName, ym, initialLessons, idToken 
   return (<main>
     <h1>🌸 {+ym.slice(5)} 月我的課表</h1>
     <p className="sub">{studentName} 你好，這是你這個月的上課時間；請假會請老師幫你安排新時間，打卡要在上課當天才能按。</p>
+    {remainingLessons === 0 ? (
+      <div className="card"><b>🔔 堂數已經排完</b><p className="m">如要繼續上課，請聯絡 {teacherName} 老師續課；系統不會再自動安排新的課程。</p></div>
+    ) : (
+      <p className="pillt">剩餘 {remainingLessons} 堂</p>
+    )}
     {notice && <p className="toast-overlay" role="status">{notice}</p>}
     {!lessons.length && <p className="sub">這個月目前沒有排定的課，請等老師通知。</p>}
     {lessons.map(l => {

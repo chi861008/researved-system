@@ -124,7 +124,7 @@ export function carryForward(
   }
 }
 
-export interface SchedStudent { id: string; name: string }
+export interface SchedStudent { id: string; name: string; remainingLessons?: number }
 export interface Lesson { studentId: string; date: string; start: number }
 // leave_requested 不是排課演算法產生的，是學生在自己的課表卡片按「請假」時，API 直接插入一筆
 // unassigned（見 app/api/students/lessons/[lessonId]/leave/route.ts），借用同一套「待補其他老師」
@@ -161,6 +161,7 @@ export function runScheduling(input: ScheduleInput): ScheduleResult {
   const allDates = datesBetween(from, to);
   const lessons: Lesson[] = [];
   const unassigned: UnassignedEntry[] = [];
+  const assignedCount = new Map<string, number>();
 
   for (let weekStart = weekStartOf(scheduleStart); weekStart <= to; weekStart = addDays(weekStart, 7)) {
     const weekDates = allDates.filter(d => weekStartOf(d) === weekStart && d >= scheduleStart);
@@ -169,6 +170,8 @@ export function runScheduling(input: ScheduleInput): ScheduleResult {
     interface Seat { student: SchedStudent; candidates: SlotKey[]; compatibleCount: number }
     const seats: Seat[] = [];
     for (const st of students) {
+      // 沒有堂數就不再排，也不產生「待補老師」；未提供堂數則保留舊版無上限行為。
+      if (st.remainingLessons !== undefined && (assignedCount.get(st.id) ?? 0) >= st.remainingLessons) continue;
       const alreadyThisWeek =
         lessons.some(l => l.studentId === st.id && weekStartOf(l.date) === weekStart) ||
         existingLessons.some(l => l.studentId === st.id && weekStartOf(l.date) === weekStart) ||
@@ -202,7 +205,9 @@ export function runScheduling(input: ScheduleInput): ScheduleResult {
 
     for (const [key, i] of owner) {
       const [date, s] = key.split('|');
-      lessons.push({ studentId: seats[i].student.id, date, start: Number(s) });
+      const studentId = seats[i].student.id;
+      lessons.push({ studentId, date, start: Number(s) });
+      assignedCount.set(studentId, (assignedCount.get(studentId) ?? 0) + 1);
     }
 
     seats.forEach((seat, i) => {
@@ -214,6 +219,19 @@ export function runScheduling(input: ScheduleInput): ScheduleResult {
     });
   }
 
+  // 可能先遇到排不到的週、後面才成功排滿堂數；既然堂數已用完，前面的待補也不能再讓老師
+  // 額外補課，否則會超過方案堂數。只保留「排完後仍不足堂數」的待補筆數。
+  const keptByStudent = new Map<string, number>();
+  const cappedUnassigned = unassigned.filter(u => {
+    const st = students.find(s => s.id === u.studentId);
+    if (st?.remainingLessons === undefined) return true;
+    const room = Math.max(0, st.remainingLessons - (assignedCount.get(st.id) ?? 0));
+    const kept = keptByStudent.get(st.id) ?? 0;
+    if (kept >= room) return false;
+    keptByStudent.set(st.id, kept + 1);
+    return true;
+  });
+
   lessons.sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start);
-  return { lessons, unassigned };
+  return { lessons, unassigned: cappedUnassigned };
 }

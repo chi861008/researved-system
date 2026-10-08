@@ -3,7 +3,7 @@
 import { datesBetween, parseHM, slotKey, weekday } from './scheduling';
 import type { WeeklyPattern } from './weeklyPattern';
 
-export interface DemoStudent { id: string; name: string }
+export interface DemoStudent { id: string; name: string; remainingLessons?: number }
 export interface DemoTeacher { id: string; name: string }
 
 export const DEMO_TEACHERS: DemoTeacher[] = [
@@ -18,15 +18,15 @@ export const MAIN_TEACHER_ID = DEMO_TEACHERS[0].id;
 
 export const DEMO_STUDENTS_BY_TEACHER: Record<string, DemoStudent[]> = {
   t1: [
-    { id: 't1-s1', name: 'Amy' },
-    { id: 't1-s2', name: 'Bella' },
-    { id: 't1-s3', name: 'Cindy' },
-    { id: 't1-s4', name: 'Dora' },
-    { id: 't1-s5', name: 'Emma' },
+    { id: 't1-s1', name: 'Amy', remainingLessons: 8 },
+    { id: 't1-s2', name: 'Bella', remainingLessons: 8 },
+    { id: 't1-s3', name: 'Cindy', remainingLessons: 8 },
+    { id: 't1-s4', name: 'Dora', remainingLessons: 8 },
+    { id: 't1-s5', name: 'Emma', remainingLessons: 8 },
   ],
   t2: [
-    { id: 't2-s1', name: 'Grace' },
-    { id: 't2-s2', name: 'Henry' },
+    { id: 't2-s1', name: 'Grace', remainingLessons: 8 },
+    { id: 't2-s2', name: 'Henry', remainingLessons: 8 },
   ],
 };
 
@@ -102,7 +102,7 @@ export function getMyJoin(teacherId: string): DemoStudent | null {
 /** 學生第一次填名字加入：寫進「老師的學生名單」，也記住「我在這位老師底下是誰」 */
 export function joinAsStudent(teacherId: string, name: string): DemoStudent {
   const store = readJoinedStore();
-  const student: DemoStudent = { id: `${teacherId}-join-${Date.now()}`, name };
+  const student: DemoStudent = { id: `${teacherId}-join-${Date.now()}`, name, remainingLessons: 0 };
   store[teacherId] = [...(store[teacherId] ?? []), student];
   writeJoinedStore(store);
   if (typeof window !== 'undefined') window.localStorage.setItem(MY_JOIN_KEY_PREFIX + teacherId, JSON.stringify(student));

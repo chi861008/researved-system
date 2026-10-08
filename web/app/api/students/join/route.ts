@@ -16,8 +16,11 @@ export async function POST(req: Request) {
   const verified = typeof idToken === 'string' ? await verifyLineIdToken(idToken) : null;
   if (!verified) return NextResponse.json({ error: '無法確認你的 LINE 身分，請重新打開連結。' }, { status: 401 });
 
-  const { data: existing } = await supabase.from('students').select('id,name,weekly_pattern').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
+  const { data: existing } = await supabase.from('students').select('id,name,weekly_pattern,lesson_credits').eq('teacher_id', teacherId).eq('line_user_id', verified.sub).maybeSingle();
   if (existing) {
+    const { count: usedCredits } = await supabase.from('lessons').select('id', { count: 'exact', head: true })
+      .eq('student_id', existing.id).eq('status', 'active');
+    const remainingLessons = Math.max(0, (existing.lesson_credits ?? 0) - (usedCredits ?? 0));
     // 這個連結指定月份（?ym=）如果已經送出過時段，一起回傳，前端才能把畫面還原成跟上次送出時一樣
     // （鎖定＋顯示她真正選過的格子），不然重新打開連結會看起來像沒填過。現在可能同時好幾個月都在
     // 收集中，一定要照連結帶的 ym 查那一個月，不能再猜「唯一收集中的月份」（查到兩筆會整個失效）；
@@ -31,7 +34,7 @@ export async function POST(req: Request) {
         .gte('date', ymFrom(period.ym)).lte('date', ymEnd(period.ym));
       existingAvailability = (slotRows ?? []).map(r => slotKey(r.date, r.start_min));
     }
-    return NextResponse.json({ id: existing.id, name: existing.name, weeklyPattern: existing.weekly_pattern ?? null, existingAvailability });
+    return NextResponse.json({ id: existing.id, name: existing.name, weeklyPattern: existing.weekly_pattern ?? null, existingAvailability, remainingLessons });
   }
 
   const nm = typeof name === 'string' ? name.trim() : '';
@@ -43,5 +46,5 @@ export async function POST(req: Request) {
     if (error.code === '23505') return NextResponse.json({ error: '這個 LINE 帳號已經是其他老師的學生了。' }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ id: data.id, name: data.name, weeklyPattern: null });
+  return NextResponse.json({ id: data.id, name: data.name, weeklyPattern: null, remainingLessons: 0 });
 }
