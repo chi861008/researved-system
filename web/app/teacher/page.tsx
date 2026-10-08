@@ -1257,7 +1257,8 @@ export default function TeacherPage() {
                   ls.map(l => `${md(l.date)}（${WD[weekday(l.date)]}）${hhmm(l.start)}–${hhmm(l.start + L)}　${l.teacherName || currentTeacherName} 老師`).join('\n') +
                   (n ? `\n另有 ${n} 週的課還在安排授課老師，確定後會再通知你。` : '') +
                   (deferred.length ? `\n${deferred.map(u => `${md(u.weekStart)} 起這週`).join('、')}沒有可上課時段，這些週先不排課，順延至後續可上課週，仍以每週一堂為原則。` : '') +
-                  ((s.remainingLessons ?? 0) === 0 ? `\n\n🔔 你的堂數已經排完了，如要繼續上課，請聯絡 ${currentTeacherName} 老師續課。` : `\n\n剩餘堂數：${s.remainingLessons ?? 0} 堂`);
+                  ((s.remainingLessons ?? 0) === 0 ? `\n\n🔔 你的堂數已經排完了，如要繼續上課，請聯絡 ${currentTeacherName} 老師續課。` : `\n\n剩餘堂數：${s.remainingLessons ?? 0} 堂`) +
+                  (inviteLink ? `\n\n📅 查看最新課表、請假或打卡：\n${inviteLink}` : '');
                 return (
                   <div className="card" key={s.id}>
                     <b>{s.name}</b> {period.notified && <span className="pillt">已通知</span>}
