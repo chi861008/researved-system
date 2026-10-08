@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
 import { getTeacherSession } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -9,16 +10,33 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ studen
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
 
-  const { remainingLessons } = await req.json().catch(() => ({}));
-  if (!Number.isInteger(remainingLessons) || remainingLessons < 0) return NextResponse.json({ error: '堂數必須是 0 以上的整數' }, { status: 400 });
-  const { data: student } = await supabase.from('students').select('id').eq('id', studentId).eq('teacher_id', session.id).maybeSingle();
+  const body = await req.json().catch(() => ({}));
+  const { data: student } = await supabase.from('students').select('id,lesson_credits,line_user_id').eq('id', studentId).eq('teacher_id', session.id).maybeSingle();
   if (!student) return NextResponse.json({ error: '找不到這位學生' }, { status: 404 });
 
-  // lesson_credits 存累計購買堂數；老師輸入的是「現在還剩幾堂」，所以要加回已存在的 active lessons。
-  // 這讓重新排課刪除課程時堂數自然退回，而不是永久多扣一次。
+  if (body.regenerateInvite === true) {
+    if (student.line_user_id) return NextResponse.json({ error: '這位學生已經綁定 LINE，不需要加入連結。' }, { status: 409 });
+    const inviteToken = randomBytes(24).toString('base64url');
+    const { error } = await supabase.from('students').update({ invite_token: inviteToken }).eq('id', studentId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, inviteToken });
+  }
+
   const { count } = await supabase.from('lessons').select('id', { count: 'exact', head: true })
     .eq('student_id', studentId).eq('status', 'active');
-  const lessonCredits = (count ?? 0) + remainingLessons;
+  const activeLessons = count ?? 0;
+  let lessonCredits: number;
+  let remainingLessons: number;
+  if (Number.isInteger(body.addLessons) && body.addLessons > 0) {
+    lessonCredits = (student.lesson_credits ?? 0) + body.addLessons;
+    remainingLessons = Math.max(0, lessonCredits - activeLessons);
+  } else {
+    remainingLessons = body.remainingLessons;
+    if (!Number.isInteger(remainingLessons) || remainingLessons < 0) return NextResponse.json({ error: '堂數必須是 0 以上的整數' }, { status: 400 });
+    // lesson_credits 存累計購買堂數；老師輸入的是「現在還剩幾堂」，所以要加回已存在的 active lessons。
+    // 這讓重新排課刪除課程時堂數自然退回，而不是永久多扣一次。
+    lessonCredits = activeLessons + remainingLessons;
+  }
   const { error } = await supabase.from('students').update({ lesson_credits: lessonCredits }).eq('id', studentId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, remainingLessons });

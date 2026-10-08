@@ -3,7 +3,13 @@
 import { datesBetween, parseHM, slotKey, weekday } from './scheduling';
 import type { WeeklyPattern } from './weeklyPattern';
 
-export interface DemoStudent { id: string; name: string; remainingLessons?: number }
+export interface DemoStudent {
+  id: string;
+  name: string;
+  remainingLessons?: number;
+  linked?: boolean;
+  inviteToken?: string;
+}
 export interface DemoTeacher { id: string; name: string }
 
 export const DEMO_TEACHERS: DemoTeacher[] = [

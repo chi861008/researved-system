@@ -18,6 +18,7 @@ create table students (
   teacher_id uuid not null references teachers,   -- 學生屬於哪位老師；老師之間互相看不到對方的學生
   name text not null,
   lesson_credits int not null default 0 check (lesson_credits >= 0), -- 累計購買堂數；剩餘＝此值－active lessons
+  invite_token text unique,       -- 老師先建學生後的一次性個人加入連結；綁定成功即清空
   line_user_id text unique,        -- 來自 LIFF（須與官方帳號同一 Provider）
   line_group_id text,              -- 該學生的 LINE 群組（目前通知改以「分享到 LINE」為主，群組非必要）
   consent_at timestamptz

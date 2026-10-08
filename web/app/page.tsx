@@ -370,6 +370,7 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const inviteToken = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('invite');
 
   useEffect(() => {
     if (!idToken) return;
@@ -378,14 +379,14 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
     const ym = new URLSearchParams(window.location.search).get('ym');
     (async () => {
       try {
-        const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, ym }) });
+        const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, ym, inviteToken }) });
         const data = await res.json().catch(() => ({}));
         if (res.ok && !data.needsName) { onJoined(data); return; }
         if (!res.ok) setError(data?.error || '無法確認你的身分，請重新打開連結。');
       } catch { setError('無法確認你的身分，請重新打開連結。'); }
       setChecked(true);
     })();
-  }, [idToken, teacherId, onJoined]);
+  }, [idToken, teacherId, inviteToken, onJoined]);
 
   async function submit() {
     const nm = name.trim();
@@ -393,7 +394,7 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
     setBusy(true);
     try {
       const ym = new URLSearchParams(window.location.search).get('ym');
-      const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, name: nm, ym }) });
+      const res = await fetch('/api/students/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, teacherId, name: nm, ym, inviteToken }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data?.error || '加入失敗，請稍後再試。'); setBusy(false); return; }
       onJoined(data);
@@ -404,6 +405,13 @@ function RealJoinView({ teacherId, teacherName, courseName, idToken, needLogin, 
     return (<main>
       <h1>🌸 加入 {teacherName} 的{courseName}課程</h1>
       <p className="sub">{error || '正在確認你的身分…'}</p>
+    </main>);
+  }
+
+  if (inviteToken && error) {
+    return (<main>
+      <h1>🌸 加入 {teacherName} 的{courseName}課程</h1>
+      <div className="card"><b className="warn">加入連結無法使用</b><p className="m">{error}</p></div>
     </main>);
   }
 

@@ -310,8 +310,10 @@ export default function TeacherPage() {
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [addStudentBusy, setAddStudentBusy] = useState(false);
   const [creditStudentId, setCreditStudentId] = useState<string | null>(null);
+  const [creditMode, setCreditMode] = useState<'set' | 'add'>('set');
   const [creditInput, setCreditInput] = useState('');
   const [creditSaving, setCreditSaving] = useState(false);
+  const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [blockForm, setBlockForm] = useState({ weekday: '3', start: '960', end: '1020' });
@@ -320,7 +322,7 @@ export default function TeacherPage() {
   const [rangeBusy, setRangeBusy] = useState(false);
   const [blockApplied, setBlockApplied] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
-  const [tab, setTab] = useState<'hours' | 'plan'>('hours');
+  const [tab, setTab] = useState<'hours' | 'plan' | 'students'>('hours');
   const [planSection, setPlanSection] = useState<'schedule' | 'confirm' | 'notify'>('schedule');
   const [actingStudentId, setActingStudentId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
@@ -615,46 +617,72 @@ export default function TeacherPage() {
     if (ex) { setNotice(`${nm} 已經在名單裡。`); return; }
     setAddStudentBusy(true);
     try {
-      let id: string;
+      let student: DemoStudent;
       if (realSession) {
         const res = await fetch('/api/teacher/students', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nm, remainingLessons }) });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) { setNotice(data?.error || '新增失敗，請稍後再試。'); return; }
-        id = data.id;
+        student = data;
       } else {
-        id = `s${students.length + 1}_${Date.now()}`;
+        student = { id: `s${students.length + 1}_${Date.now()}`, name: nm, remainingLessons, linked: false };
       }
-      setStudents(prev => [...prev, { id, name: nm, remainingLessons }]);
-      setStudentAvailability(prev => { const m = new Map(prev); m.set(id, new Set()); return m; });
+      setStudents(prev => [...prev, student]);
+      setStudentAvailability(prev => { const m = new Map(prev); m.set(student.id, new Set()); return m; });
       setNewStudentName('');
       setNewStudentLessons('8');
       setAddStudentOpen(false);
-      setNotice(`已新增 ${nm}。可以按「幫他填」先填寫上課時間。`);
+      setNotice(`已新增 ${nm}。請在學生管理複製他的個人加入連結。`);
     } finally { setAddStudentBusy(false); }
   }
-  function openCredits(student: DemoStudent) {
+  function openCredits(student: DemoStudent, mode: 'set' | 'add' = 'set') {
     setCreditStudentId(student.id);
-    setCreditInput(String(student.remainingLessons ?? 0));
+    setCreditMode(mode);
+    setCreditInput(mode === 'add' ? '' : String(student.remainingLessons ?? 0));
   }
   async function saveCredits() {
     if (!creditStudentId || creditSaving) return;
-    const remainingLessons = creditInput.trim() === '' ? NaN : Number(creditInput);
-    if (!Number.isInteger(remainingLessons) || remainingLessons < 0) { setNotice('堂數必須是 0 以上的整數。'); return; }
+    const inputLessons = creditInput.trim() === '' ? NaN : Number(creditInput);
+    if (!Number.isInteger(inputLessons) || inputLessons < (creditMode === 'add' ? 1 : 0)) { setNotice(creditMode === 'add' ? '新增堂數必須是 1 以上的整數。' : '堂數必須是 0 以上的整數。'); return; }
     setCreditSaving(true);
     try {
+      let remainingLessons = creditMode === 'add'
+        ? (students.find(s => s.id === creditStudentId)?.remainingLessons ?? 0) + inputLessons
+        : inputLessons;
       if (realSession) {
         const res = await fetch(`/api/teacher/students/${creditStudentId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ remainingLessons }),
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(creditMode === 'add' ? { addLessons: inputLessons } : { remainingLessons: inputLessons }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) { setNotice(data?.error || '更新堂數失敗，請稍後再試。'); return; }
+        remainingLessons = data.remainingLessons;
       }
       const nm = studentName(creditStudentId);
       setStudents(prev => prev.map(s => s.id === creditStudentId ? { ...s, remainingLessons } : s));
       setCreditStudentId(null);
       const alreadyScheduled = period.status === 'draft' || period.status === 'approved' || period.status === 'notified';
-      setNotice(`已將 ${nm} 的剩餘堂數設為 ${remainingLessons} 堂。${alreadyScheduled ? '這個月已經排過課，請按「重新排課」後再執行自動排課，新的堂數才會套用。' : ''}`);
+      setNotice(creditMode === 'add'
+        ? `已替 ${nm} 增加 ${inputLessons} 堂，目前剩餘 ${remainingLessons} 堂。${alreadyScheduled ? '這個月已經排過課，如要套用新堂數請重新排課。' : ''}`
+        : `已將 ${nm} 的剩餘堂數設為 ${remainingLessons} 堂。${alreadyScheduled ? '這個月已經排過課，請按「重新排課」後再執行自動排課，新的堂數才會套用。' : ''}`);
     } finally { setCreditSaving(false); }
+  }
+  function personalInviteLink(student: DemoStudent) {
+    if (!student.inviteToken) return '';
+    const base = STUDENT_LIFF_BASE || (origin ? `${origin}/` : '');
+    return base ? `${base}?t=${currentTeacherId}&invite=${encodeURIComponent(student.inviteToken)}&ym=${curYm}` : '';
+  }
+  async function generateInvite(student: DemoStudent) {
+    if (!realSession || inviteBusyId) return;
+    setInviteBusyId(student.id);
+    try {
+      const res = await fetch(`/api/teacher/students/${student.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regenerateInvite: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setNotice(data?.error || '產生連結失敗，請稍後再試。'); return; }
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, inviteToken: data.inviteToken, linked: false } : s));
+      setNotice(`已替 ${student.name} 產生個人加入連結。`);
+    } finally { setInviteBusyId(null); }
   }
   async function deleteStudent(id: string) {
     if (pendingDeleteId !== id) { setPendingDeleteId(id); setNotice(`確定要刪除 ${studentName(id)} 嗎？所有已選時段與課表紀錄都會一併刪除、無法復原。如果要重新收這位學生，之後可以重新登錄。再按一次「確認刪除」才會真的刪除。`); return; }
@@ -1215,13 +1243,58 @@ export default function TeacherPage() {
           </div></div>
         </div>
       )}
+
+      {tab === 'students' && (
+        <div>
+          <div className="card">
+            <b>學生管理</b>
+            <p className="hint">先建立學生與堂數，再把他的個人加入連結傳給本人。學生第一次用 LINE 開啟後，會直接綁定這筆資料，不用再輸入名字。</p>
+            <button className="btn pri" style={{ width: '100%' }} onClick={() => setAddStudentOpen(true)}>＋ 新增學生</button>
+          </div>
+          {students.length === 0 && <p className="hint">目前還沒有學生，請先新增第一位學生。</p>}
+          {students.map(st => {
+            const link = personalInviteLink(st);
+            return (
+              <div className="card" key={st.id}>
+                <div className="li" style={{ paddingTop: 0 }}>
+                  <span><b>{st.name}</b><br /><span className="m">剩餘 {st.remainingLessons ?? 0} 堂</span></span>
+                  <span className={st.linked ? '' : 'warn'}>{st.linked ? '已加入 LINE' : realSession ? '待加入' : '展示學生'}</span>
+                </div>
+                <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+                  <button className="btn" onClick={() => openCredits(st, 'add')}>增加堂數</button>
+                  <button className="btn" onClick={() => openCredits(st, 'set')}>調整餘額</button>
+                  <button className="btn" onClick={() => setActingStudentId(st.id)}>{filled(st) ? '修改時段' : '幫他填時段'}</button>
+                </div>
+                {realSession && !st.linked && (
+                  <div style={{ marginTop: 10 }}>
+                    {link ? <>
+                      <p className="hint" style={{ marginBottom: 4 }}>這是 {st.name} 專用的一次性加入連結，請只傳給本人。</p>
+                      <CopyBtn text={`${st.name} 你好 🌸\n請用 LINE 開啟這個連結加入課程：\n${link}`} style={{ width: '100%' }} />
+                      <button className="btn outline" style={{ width: '100%', marginTop: 6 }} disabled={inviteBusyId === st.id} onClick={() => generateInvite(st)}>
+                        {inviteBusyId === st.id ? '產生中…' : '讓舊連結失效並重新產生'}
+                      </button>
+                    </> : (
+                      <button className="btn" style={{ width: '100%' }} disabled={inviteBusyId === st.id} onClick={() => generateInvite(st)}>
+                        {inviteBusyId === st.id ? '產生中…' : '產生個人加入連結'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                <button className="btn outline" style={{ width: '100%', marginTop: 10 }} disabled={deletingId === st.id} onClick={() => deleteStudent(st.id)}>
+                  {deletingId === st.id ? '刪除中…' : pendingDeleteId === st.id ? '確認刪除學生' : '刪除學生'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>)}
 
     {/* ---- 底部分頁列 ---- */}
     {!activeStudent && (
       <div className="bar" style={{ padding: '0 0 env(safe-area-inset-bottom,0px)' }}>
         <div className="tabs" role="tablist">
-          {([['hours', '上班時間'], ['plan', '自動排課']] as const).map(([k, label]) => (
+          {([['hours', '上班時間'], ['plan', '自動排課'], ['students', '學生管理']] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setNotice(''); if (k === 'plan') setPlanSection('schedule'); }}>{label}</button>
           ))}
           <Link href="/teacher/manage" role="tab">老師管理</Link>
@@ -1273,7 +1346,7 @@ export default function TeacherPage() {
       <div className="ov" onClick={() => setAddStudentOpen(false)} />
       <div className="sheet" role="dialog" aria-label="新增學生">
         <b>新增學生</b>
-        <p className="hint">學生第一次從 LINE 進來填寫時，會自動出現在名單。不用 LINE 的學生，可以在這裡手動新增。</p>
+        <p className="hint">先輸入學生姓名與目前可用堂數。新增後，系統會產生他的個人加入連結。</p>
         <div className="rng">
           <input className="tin" placeholder="學生名稱" autoFocus value={newStudentName}
             onChange={e => setNewStudentName(e.target.value)}
@@ -1290,13 +1363,13 @@ export default function TeacherPage() {
     {creditStudentId && (<>
       <div className="ov" onClick={() => setCreditStudentId(null)} />
       <div className="sheet" role="dialog" aria-label="設定剩餘堂數">
-        <b>{studentName(creditStudentId)} 的剩餘堂數</b>
-        <p className="hint">填寫從現在開始還能排幾堂。排入課表後會自動扣除；重新排課清除課表時會自動退回。</p>
-        <input className="tin" type="number" min="0" step="1" inputMode="numeric" autoFocus value={creditInput}
+        <b>{creditMode === 'add' ? `替 ${studentName(creditStudentId)} 增加堂數` : `${studentName(creditStudentId)} 的剩餘堂數`}</b>
+        <p className="hint">{creditMode === 'add' ? '輸入這次新購買的堂數，會直接加到目前餘額。' : '填寫從現在開始還能排幾堂。排入課表後會自動扣除；重新排課清除課表時會自動退回。'}</p>
+        <input className="tin" type="number" min={creditMode === 'add' ? '1' : '0'} step="1" inputMode="numeric" autoFocus value={creditInput}
           onChange={e => setCreditInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveCredits(); }} />
         <div className="row" style={{ marginTop: 12 }}>
           <button className="btn" disabled={creditSaving} onClick={() => setCreditStudentId(null)}>取消</button>
-          <button className="btn pri" disabled={creditSaving} onClick={saveCredits}>{creditSaving ? '儲存中…' : '儲存堂數'}</button>
+          <button className="btn pri" disabled={creditSaving} onClick={saveCredits}>{creditSaving ? '儲存中…' : creditMode === 'add' ? '確認增加' : '儲存堂數'}</button>
         </div>
       </div>
     </>)}

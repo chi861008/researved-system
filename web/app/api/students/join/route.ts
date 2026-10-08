@@ -8,7 +8,7 @@ import { ymFrom, ymEnd } from '@/lib/ym';
 // 真老師模式的「加入」：不用 localStorage，完全靠已驗證的 LINE userId 判斷「這個人是不是已經加入過」，
 // 換裝置、清瀏覽器資料都還認得出來。沒帶 name 時只是在「檢查有沒有加入過」，查不到才要前端顯示填名字表單。
 export async function POST(req: Request) {
-  const { idToken, teacherId, name, ym } = await req.json().catch(() => ({}));
+  const { idToken, teacherId, name, ym, inviteToken } = await req.json().catch(() => ({}));
   if (!teacherId || !isUuid(teacherId)) return NextResponse.json({ error: '連結不完整' }, { status: 400 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
@@ -35,6 +35,39 @@ export async function POST(req: Request) {
       existingAvailability = (slotRows ?? []).map(r => slotKey(r.date, r.start_min));
     }
     return NextResponse.json({ id: existing.id, name: existing.name, weeklyPattern: existing.weekly_pattern ?? null, existingAvailability, remainingLessons });
+  }
+
+  // 老師先建立好的學生用個人 token 綁定。成功後立刻清掉 token，連結即使被轉傳也不能再綁第二個人。
+  if (typeof inviteToken === 'string' && inviteToken) {
+    const { data: invited } = await supabase.from('students')
+      .select('id,name,weekly_pattern,lesson_credits,line_user_id')
+      .eq('teacher_id', teacherId).eq('invite_token', inviteToken).maybeSingle();
+    if (!invited || invited.line_user_id) return NextResponse.json({ error: '這個加入連結無效或已經使用過，請向老師索取新的連結。' }, { status: 404 });
+
+    const { data: bound, error: bindError } = await supabase.from('students').update({
+      line_user_id: verified.sub,
+      invite_token: null,
+      consent_at: new Date().toISOString(),
+    }).eq('id', invited.id).eq('invite_token', inviteToken).select('id').maybeSingle();
+    if (bindError) {
+      if (bindError.code === '23505') return NextResponse.json({ error: '這個 LINE 帳號已經是其他老師的學生了。' }, { status: 409 });
+      return NextResponse.json({ error: bindError.message }, { status: 500 });
+    }
+    if (!bound) return NextResponse.json({ error: '這個加入連結已經使用過，請向老師確認。' }, { status: 409 });
+
+    const { count: usedCredits } = await supabase.from('lessons').select('id', { count: 'exact', head: true })
+      .eq('student_id', invited.id).eq('status', 'active');
+    const remainingLessons = Math.max(0, (invited.lesson_credits ?? 0) - (usedCredits ?? 0));
+    let existingAvailability: string[] = [];
+    const query = supabase.from('periods').select('ym').eq('teacher_id', teacherId).eq('status', 'collecting');
+    const { data: period } = typeof ym === 'string' && ym ? await query.eq('ym', ym).maybeSingle() : await query.maybeSingle();
+    if (period) {
+      const { data: slotRows } = await supabase.from('slots').select('date,start_min')
+        .eq('owner_type', 'student').eq('owner_id', invited.id)
+        .gte('date', ymFrom(period.ym)).lte('date', ymEnd(period.ym));
+      existingAvailability = (slotRows ?? []).map(r => slotKey(r.date, r.start_min));
+    }
+    return NextResponse.json({ id: invited.id, name: invited.name, weeklyPattern: invited.weekly_pattern ?? null, existingAvailability, remainingLessons });
   }
 
   const nm = typeof name === 'string' ? name.trim() : '';
