@@ -35,7 +35,8 @@ export async function POST(req: Request) {
   if (!period) return bad('目前沒有開放這個月的選課，請跟老師確認。', 409);
 
   const keys = windows.map((w: { date: string; start: number }) => slotKey(w.date, w.start));
-  const { error } = await replaceOwnerAvailability(supabase, 'student', student.id, keys, ymFrom(ym));
+  // 只覆蓋連結指定的月份，不能因為學生修改 7 月時段，就把 8 月之後已填好的時段一起刪掉。
+  const { error } = await replaceOwnerAvailability(supabase, 'student', student.id, keys, ymFrom(ym), ymEnd(ym));
   if (error) return bad(error, 500);
   if (remember) {
     const pattern = deriveWeeklyPattern(new Set(keys), datesBetween(ymFrom(ym), ymEnd(ym)), STUDIO_STARTS);

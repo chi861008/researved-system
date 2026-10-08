@@ -13,15 +13,17 @@ export async function replaceOwnerAvailability(
   ownerId: string,
   keys: Iterable<string>,
   dateFrom?: string,
+  dateTo?: string,
 ): Promise<{ error?: string }> {
   let del = supabase.from('slots').delete().eq('owner_type', ownerType).eq('owner_id', ownerId);
   if (dateFrom) del = del.gte('date', dateFrom);
+  if (dateTo) del = del.lte('date', dateTo);
   const { error: delErr } = await del;
   if (delErr) return { error: delErr.message };
 
   const rows = [...keys]
     .map(k => { const [date, s] = k.split('|'); return { owner_type: ownerType, owner_id: ownerId, date, start_min: Number(s) }; })
-    .filter(r => !dateFrom || r.date >= dateFrom);
+    .filter(r => (!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo));
   if (!rows.length) return {};
   const { error: insErr } = await supabase.from('slots').insert(rows);
   return insErr ? { error: insErr.message } : {};

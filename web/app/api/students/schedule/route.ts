@@ -9,7 +9,7 @@ import { isUuid } from '@/lib/id';
 // 這樣就算她這個月所有課都請假、暫時 0 堂 active，也還是看得到「這個月在處理中」而不是整個消失
 // 跳去更舊的月份或顯示「沒有課表」，避免請假中的狀態看起來像系統壞掉。
 export async function POST(req: Request) {
-  const { idToken, teacherId } = await req.json().catch(() => ({}));
+  const { idToken, teacherId, ym } = await req.json().catch(() => ({}));
   if (!teacherId || !isUuid(teacherId)) return NextResponse.json({ error: '連結不完整' }, { status: 400 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: '資料庫尚未設定' }, { status: 503 });
@@ -24,7 +24,10 @@ export async function POST(req: Request) {
     .eq('student_id', student.id).eq('status', 'active');
   const remainingLessons = Math.max(0, (student.lesson_credits ?? 0) - (usedCredits ?? 0));
 
-  const { data: period } = await supabase.from('periods').select('id,ym,status').eq('teacher_id', teacherId).neq('status', 'collecting').order('ym', { ascending: false }).limit(1).maybeSingle();
+  let periodQuery = supabase.from('periods').select('id,ym,status').eq('teacher_id', teacherId).neq('status', 'collecting');
+  if (typeof ym === 'string' && /^\d{4}-\d{2}$/.test(ym)) periodQuery = periodQuery.eq('ym', ym);
+  else periodQuery = periodQuery.order('ym', { ascending: false }).limit(1);
+  const { data: period } = await periodQuery.maybeSingle();
   if (!period) return NextResponse.json({ noSchedule: true, remainingLessons });
 
   const { data: lessons } = await supabase.from('lessons').select('id,date,start_min,teacher_name,checked_in_at')

@@ -130,7 +130,11 @@ export default function Page() {
     if (!resolved?.isReal || !joined || !noOpenPeriod) return;
     fetch('/api/students/schedule', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken, teacherId: resolved.id }),
+      body: JSON.stringify({
+        idToken,
+        teacherId: resolved.id,
+        ym: new URLSearchParams(window.location.search).get('ym'),
+      }),
     }).then(r => r.json()).then(data => {
       if (data.ym) setMySchedule({ ym: data.ym, lessons: data.lessons ?? [], remainingLessons: data.remainingLessons ?? 0 });
     }).catch(() => {});

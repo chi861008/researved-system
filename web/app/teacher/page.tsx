@@ -113,6 +113,8 @@ async function fetchRealTeacherState(): Promise<{ session: { id: string; name: s
     }
   }
   const ymKeys = Object.keys(periods).sort();
+  const requestedYm = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('ym');
+  const initialYm = requestedYm && periods[requestedYm] ? requestedYm : ymKeys[ymKeys.length - 1];
 
   return {
     session: { id: data.id, name: data.name },
@@ -126,7 +128,7 @@ async function fetchRealTeacherState(): Promise<{ session: { id: string; name: s
       names: data.names ?? [],
       weeklyBlock,
       periods,
-      curYm: ymKeys[ymKeys.length - 1],
+      curYm: initialYm,
       proxy: data.proxy ?? {},
     },
   };
@@ -278,6 +280,15 @@ export default function TeacherPage() {
   const setProxy = makeFieldSetter('proxy');
 
   const { students, studentAvailability, teacherAvailability, names, weeklyBlock, periods, curYm, proxy } = teacherStates[currentTeacherId];
+
+  function selectMonth(ym: string) {
+    setCurYm(ym);
+    if (realSession) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('ym', ym);
+      window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+    }
+  }
 
   function switchTeacher(id: string) {
     if (id === currentTeacherId) return;
@@ -523,7 +534,7 @@ export default function TeacherPage() {
   function createUpcomingMonth() {
     const nx = nextYm(lastYm);
     setPeriods(p => ({ ...p, [nx]: { status: 'upcoming', lessons: [], unassigned: [], notified: false, log: [] } }));
-    setCurYm(nx); setTab('hours');
+    selectMonth(nx); setTab('hours');
     // 開一個全新月份：如果之前記住過常用時段，直接幫忙先勾好，不用等她自己重新點一次。
     const pattern = realSession ? teacherPattern : getDemoTeacherPattern(currentTeacherId);
     if (pattern && pattern.length) {
@@ -641,7 +652,8 @@ export default function TeacherPage() {
       const nm = studentName(creditStudentId);
       setStudents(prev => prev.map(s => s.id === creditStudentId ? { ...s, remainingLessons } : s));
       setCreditStudentId(null);
-      setNotice(`已將 ${nm} 的剩餘堂數設為 ${remainingLessons} 堂。`);
+      const alreadyScheduled = period.status === 'draft' || period.status === 'approved' || period.status === 'notified';
+      setNotice(`已將 ${nm} 的剩餘堂數設為 ${remainingLessons} 堂。${alreadyScheduled ? '這個月已經排過課，請按「重新排課」後再執行自動排課，新的堂數才會套用。' : ''}`);
     } finally { setCreditSaving(false); }
   }
   async function deleteStudent(id: string) {
@@ -906,13 +918,13 @@ export default function TeacherPage() {
     )}
     {/* ---- 月份列 ---- */}
     <div className="wnav">
-      <button type="button" aria-label="上個月" disabled={ymKeys.indexOf(curYm) === 0} onClick={() => { setCurYm(ymKeys[ymKeys.indexOf(curYm) - 1]); setNotice(''); }}>‹</button>
+      <button type="button" aria-label="上個月" disabled={ymKeys.indexOf(curYm) === 0} onClick={() => { selectMonth(ymKeys[ymKeys.indexOf(curYm) - 1]); setNotice(''); }}>‹</button>
       <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, eligibleStudents.length)}</span></b>
       <button type="button" aria-label="下個月"
         onClick={() => {
           setNotice('');
           if (curYm === lastYm) { createUpcomingMonth(); return; }
-          setCurYm(ymKeys[ymKeys.indexOf(curYm) + 1]);
+          selectMonth(ymKeys[ymKeys.indexOf(curYm) + 1]);
         }}>›</button>
     </div>
 

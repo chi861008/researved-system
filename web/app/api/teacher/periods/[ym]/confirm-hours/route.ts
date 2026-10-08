@@ -30,7 +30,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ ym: str
   }
 
   const keys = slots.map((s: { date: string; start: number }) => slotKey(s.date, s.start));
-  const { error } = await replaceOwnerAvailability(supabase, 'teacher', session.id, keys, today());
+  // 這顆按鈕只編輯目前月份；其他月份已存好的上班時間必須保留。
+  const { error } = await replaceOwnerAvailability(
+    supabase,
+    'teacher',
+    session.id,
+    keys,
+    today() > ymFrom(ym) ? today() : ymFrom(ym),
+    ymEnd(ym),
+  );
   if (error) return NextResponse.json({ error }, { status: 500 });
   if (remember) {
     const pattern = deriveWeeklyPattern(new Set(keys), datesBetween(ymFrom(ym), ymEnd(ym)), STUDIO_STARTS);
