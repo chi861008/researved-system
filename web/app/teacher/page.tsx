@@ -822,7 +822,7 @@ export default function TeacherPage() {
     return true;
   }
   async function approve() {
-    if (needsTeacher.length && !pendingApprove) { setPendingApprove(true); setNotice(`還有 ${needsTeacher.length} 位次待補其他老師。如果仍要核准，請再按一次「確認送出」。`); return; }
+    if (needsTeacher.length && !pendingApprove) { setPendingApprove(true); setNotice(`還有 ${needsTeacher.length} 位次待重新安排。如果仍要核准，請再按一次「確認送出」。`); return; }
     setApproving(true);
     try {
       if (realSession) {
@@ -891,10 +891,12 @@ export default function TeacherPage() {
     if (sheet.mode === 'fill') {
       const u = period.unassigned[sheet.unassignedIndex];
       if (u.reason === 'no_selection') { setSheet({ ...sheet, error: '學生這週沒有可上課時段，已順延，不需安排老師。' }); return; }
-      const nm = sheet.name.trim();
-      if (!nm) { setSheet({ ...sheet, error: '請輸入或選擇老師名稱' }); return; }
+      const nm = sheet.name.trim() || currentTeacherName;
       if (!sheet.key) { setSheet({ ...sheet, error: '請選擇一個上課時間' }); return; }
       const [date, startStr] = sheet.key.split('|'); const start = Number(startStr);
+      if (nm === currentTeacherName && !teacherAvailability.has(sheet.key)) {
+        setSheet({ ...sheet, error: `${currentTeacherName} 在這個時段不上班，請改選上班時間或選擇代課老師。` }); return;
+      }
       const err = findConflict(nm === currentTeacherName ? undefined : nm, date, start, u.studentId, null);
       if (err) { setSheet({ ...sheet, error: err }); return; }
       const teacherName = nm === currentTeacherName ? undefined : nm;
@@ -926,7 +928,7 @@ export default function TeacherPage() {
         const k = slotKey(d, s);
         if (!sel.has(k)) continue;
         if (period.lessons.some(x => x.id !== ignoreLessonId && x.studentId === studentId && x.date === d && x.start === s)) continue;
-        if (mode === 'time' && !teacherName && (!teacherAvailability.has(k) || period.lessons.some(x => x.id !== ignoreLessonId && !x.teacherName && x.date === d && x.start === s))) continue;
+        if (!teacherName && (!teacherAvailability.has(k) || period.lessons.some(x => x.id !== ignoreLessonId && !x.teacherName && x.date === d && x.start === s))) continue;
         out.push(k);
       }
     }
@@ -1228,12 +1230,12 @@ export default function TeacherPage() {
                 onSub={l => setSheet({ mode: 'sub', lessonId: l.id, name: l.teacherName || '', error: '' })} />
               {needsTeacher.length > 0 && (
                 <div className="card">
-                  <b className="warn">待補其他老師</b>
+                  <b className="warn">待重新安排課程</b>
                   {period.unassigned.map((u, i) => u.reason === 'no_selection' ? null : (
                     <div className="li" style={{ display: 'block' }} key={i}>
                       <b>{studentName(u.studentId)}</b>　{md(u.weekStart)} 起這週<br />
                       <span className="m">{unassignedReasonLabel[u.reason]}{u.windows.length ? `，可上課：${u.windows.join('；')}` : ''}</span><br />
-                      <button style={{ marginTop: 6 }} onClick={() => setSheet({ mode: 'fill', unassignedIndex: i, name: '', key: '', customDate: '', customStart: '', error: '' })}>安排老師與時間</button>
+                      <button style={{ marginTop: 6 }} onClick={() => setSheet({ mode: 'fill', unassignedIndex: i, name: currentTeacherName, key: '', customDate: '', customStart: '', error: '' })}>安排老師與時間</button>
                     </div>
                   ))}
                 </div>
@@ -1533,7 +1535,8 @@ function SheetView({ sheet, setSheet, names, studentName, currentTeacherName, pe
 
   const showNamePicker = sheet.mode !== 'time';
   const showTimePicker = sheet.mode !== 'sub';
-  const candidates = showTimePicker ? candidateSlots(sheet.mode === 'fill' ? 'fill' : 'time', studentId, weekStart, sheet.mode !== 'fill' ? sheet.lessonId : null, sheet.mode === 'time' ? lesson!.teacherName : undefined) : [];
+  const selectedTeacher = sheet.mode === 'fill' && sheet.name.trim() !== currentTeacherName ? sheet.name.trim() : undefined;
+  const candidates = showTimePicker ? candidateSlots(sheet.mode === 'fill' ? 'fill' : 'time', studentId, weekStart, sheet.mode !== 'fill' ? sheet.lessonId : null, sheet.mode === 'time' ? lesson!.teacherName : selectedTeacher) : [];
   const selectedKey = sheet.mode !== 'sub' ? sheet.key : '';
   const studentSlots = studentAvailability.get(studentId) ?? new Set<string>();
   const weekStudentSlots = [...studentSlots].filter(k => {
@@ -1546,12 +1549,15 @@ function SheetView({ sheet, setSheet, names, studentName, currentTeacherName, pe
     <div className="sheet" role="dialog" aria-label={title}>
       <b>{title}</b>
       {showNamePicker && (<>
-        <p className="m" style={{ margin: '10px 0 4px' }}>代課老師</p>
+        <p className="m" style={{ margin: '10px 0 4px' }}>{sheet.mode === 'fill' ? '授課老師' : '代課老師'}</p>
         <input className="tin" list="tnl" placeholder="輸入老師名稱" autoComplete="off"
           value={sheet.name}
           onChange={e => setSheet({ ...sheet, name: e.target.value, error: '' })} />
         <datalist id="tnl">{names.map(n => <option key={n} value={n} />)}</datalist>
         <div className="tags">
+          {sheet.mode === 'fill' && (
+            <button className="tag" aria-pressed={sheet.name === currentTeacherName} onClick={() => setSheet({ ...sheet, name: currentTeacherName, error: '' })}>{currentTeacherName}（原老師）</button>
+          )}
           {sheet.mode === 'sub' && lesson?.teacherName && (
             <button className="tag" aria-pressed={sheet.name === currentTeacherName} onClick={() => setSheet({ ...sheet, name: currentTeacherName, error: '' })}>改回 {currentTeacherName}</button>
           )}
