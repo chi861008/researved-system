@@ -20,7 +20,8 @@ export interface CollapsibleSlotGridProps extends SlotGridProps {
   /** 按下主按鈕時，收合之前先執行（例如老師端順便把這個月標記成開放選課）；可以是 async，
    * 這段還在跑的時候按鈕會顯示「處理中」並停用，跑完才收合，避免真老師模式打資料庫的空檔
    * 看起來像沒反應。 */
-  onConfirm?: () => void | Promise<void>;
+  /** 回傳 false 代表儲存失敗，編輯畫面會保持開啟。 */
+  onConfirm?: () => void | boolean | Promise<void | boolean>;
   /** 收起時「編輯時段」下面另外一整排的額外按鈕（例如老師端的「分享／複製文字」＋「分享圖片＋文字」），
    * 跟「編輯時段」分開一列，視覺上是另一組動作；不用就不會多這一排。 */
   collapsedActions?: React.ReactNode;
@@ -33,6 +34,18 @@ export default function CollapsibleSlotGrid({
 }: CollapsibleSlotGridProps) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
   const [confirming, setConfirming] = useState(false);
+
+  async function saveAndClose() {
+    if (confirming) return;
+    if (!onConfirm) { setExpanded(false); return; }
+    setConfirming(true);
+    try {
+      const ok = await onConfirm();
+      if (ok !== false) setExpanded(false);
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   return (<>
     <div className="card">
@@ -49,7 +62,7 @@ export default function CollapsibleSlotGrid({
     {expanded && (
       <div className="fullsheet" role="dialog" aria-label={label}>
         <div className="fs-head">
-          <button type="button" className="back" aria-label="返回" onClick={() => setExpanded(false)}>‹</button>
+          <button type="button" className="back" aria-label={onConfirm ? '返回並儲存' : '返回'} disabled={confirming} onClick={saveAndClose}>‹</button>
           <b>{label}</b>
         </div>
         <div className="fs-body">
@@ -61,11 +74,9 @@ export default function CollapsibleSlotGrid({
           {onUnlock && (
             <button className="btn" style={{ width: '100%', marginBottom: 8 }} onClick={onUnlock}>{unlockLabel ?? '編輯我的選擇'}</button>
           )}
-          <button className="btn pri" style={{ width: '100%' }} disabled={confirming} onClick={async () => {
-            setConfirming(true);
-            try { await onConfirm?.(); } finally { setConfirming(false); }
-            setExpanded(false);
-          }}>{confirming ? '處理中…' : (confirmLabel ?? '確認')}</button>
+          <button className="btn pri" style={{ width: '100%' }} disabled={confirming} onClick={saveAndClose}>
+            {confirming ? '儲存中…' : (confirmLabel ?? '確認')}
+          </button>
         </div>
       </div>
     )}

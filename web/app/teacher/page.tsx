@@ -567,7 +567,7 @@ export default function TeacherPage() {
           remember: rememberHours,
         }),
       });
-      if (!res.ok) { const data = await res.json().catch(() => ({})); setNotice(data?.error || '更新失敗，請稍後再試。'); return; }
+      if (!res.ok) { const data = await res.json().catch(() => ({})); setNotice(data?.error || '更新失敗，請稍後再試。'); return false; }
       const data = await res.json().catch(() => ({}));
       if (rememberHours) setTeacherPattern(deriveWeeklyPattern(teacherAvailability, dates, STARTS));
       // 狀態一律用 API 實際回傳的值更新：'upcoming' 第一次存會變成 'closed'，已經是 closed／
@@ -590,6 +590,7 @@ export default function TeacherPage() {
     // 不管是哪種情況，每次存完都用彈窗強調「記得把最新的通知文字傳給學生」，
     // 不要只是安靜地放在畫面下方等她自己捲下去看到。
     setShowHoursPopup(true);
+    return true;
   }
 
   // 「開放／關閉這個月收集時段」的開關：真老師模式才有，展示模式的月份一律維持現在的行為
@@ -1436,7 +1437,6 @@ function ActingView({ student, dates, isBlocked, sel, onChange, onDone, curYm }:
   student: DemoStudent; dates: string[]; isBlocked: (d: string, s: number) => boolean;
   sel: Set<string>; onChange: (n: Set<string>) => void; onDone: () => void | Promise<void>; curYm: string;
 }) {
-  const [saving, setSaving] = useState(false);
   const n = [...sel].filter(k => k.startsWith(curYm)).length;
   const summary = analyzeWeeklyPattern(sel, dates, STARTS, L);
   const summaryText = summary.runs.length
@@ -1452,12 +1452,9 @@ function ActingView({ student, dates, isBlocked, sel, onChange, onDone, curYm }:
       summaryText={summaryText}
       dates={dates} starts={STARTS} today={today} isBlocked={isBlocked}
       value={sel} onChange={onChange}
-      confirmLabel="完成選取"
+      confirmLabel={`完成並儲存（已選 ${n} 個時段）`}
+      onConfirm={onDone}
     />
-    <button className="btn pri" style={{ width: '100%', marginTop: 10 }} disabled={saving}
-      onClick={async () => { setSaving(true); try { await onDone(); } finally { setSaving(false); } }}>
-      {saving ? '儲存中…' : `完成（已選 ${n} 個時段）`}
-    </button>
   </div>);
 }
 
