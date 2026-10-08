@@ -9,7 +9,7 @@ import { buildHoursCalendarSvg } from '@/lib/hoursCalendarSvg';
 import {
   DEMO_TEACHERS, DEMO_STUDENTS_BY_TEACHER, seedDemoAvailability, seedTeacherAvailability,
   getJoinedStudents, JOINED_STORAGE_KEY, getAllTeachers, ADDED_TEACHERS_STORAGE_KEY, DELETED_TEACHERS_STORAGE_KEY,
-  getMyTeacherId, getDemoTeacherPattern, saveDemoTeacherPattern, getDemoSubmittedAvailability, SUBMITTED_AVAIL_STORAGE_PREFIX,
+  getMyTeacherId, saveDemoTeacherPattern, getDemoSubmittedAvailability, SUBMITTED_AVAIL_STORAGE_PREFIX,
   getDemoTeacherSettings, TEACHER_SETTINGS_STORAGE_PREFIX, saveDemoPeriodStatus,
   type DemoStudent, type DemoTeacher,
 } from '@/lib/teacherDemo';
@@ -63,9 +63,10 @@ interface TeacherState {
   proxy: Record<string, boolean>;
 }
 
-const FIRST_YM = '2026-11';
+const FIRST_YM = today.slice(0, 7);
 const initialPeriods = (): Record<string, PeriodState> => ({
   [FIRST_YM]: { status: 'collecting', lessons: [], unassigned: [], notified: false, log: [] },
+  [nextYm(FIRST_YM)]: { status: 'upcoming', lessons: [], unassigned: [], notified: false, log: [] },
 });
 
 function initialTeacherState(teacherId: string): TeacherState {
@@ -105,20 +106,23 @@ async function fetchRealTeacherState(): Promise<{ session: { id: string; name: s
   const periods: Record<string, PeriodState> = {};
   for (const [ym, p] of Object.entries<{ status: PeriodState['status']; lessons: Lesson[]; unassigned: UnassignedUI[] }>(data.periods ?? {}))
     periods[ym] = { status: p.status, lessons: p.lessons, unassigned: p.unassigned, notified: false, log: [] };
-  if (!Object.keys(periods).length) {
-    const todayYm = today.slice(0, 7);
-    periods[todayYm] = { status: 'upcoming', lessons: [], unassigned: [], notified: false, log: [] };
-    // 全新帳號、第一次合成的「尚未開放」月份也是一個全新空白月份，如果之前記住過常用時段，
-    // 直接先幫忙勾好，不用等她自己重新點一次。
-    if (weeklyPattern && weeklyPattern.length) {
-      const isBlockedFn = (d: string, s: number) => weekday(d) === weeklyBlock.weekday && s >= weeklyBlock.start && s < weeklyBlock.end;
-      const blankDates = datesBetween(ymFrom(todayYm), ymEnd(todayYm));
+  const todayYm = today.slice(0, 7);
+  const visibleYms = [todayYm, nextYm(todayYm)];
+  const missingYms = visibleYms.filter(ym => !periods[ym]);
+  for (const ym of visibleYms) {
+    if (!periods[ym]) periods[ym] = { status: 'upcoming', lessons: [], unassigned: [], notified: false, log: [] };
+  }
+  // 尚未建立的新月份若有記住常用時段，先在畫面帶入；已存在的月份只能使用資料庫內容，不能覆蓋。
+  if (weeklyPattern && weeklyPattern.length && missingYms.length) {
+    const isBlockedFn = (d: string, s: number) => weekday(d) === weeklyBlock.weekday && s >= weeklyBlock.start && s < weeklyBlock.end;
+    for (const ym of missingYms) {
+      const blankDates = datesBetween(ymFrom(ym), ymEnd(ym));
       teacherAvailability = new Set([...teacherAvailability, ...applyPatternToBlankMonth(weeklyPattern, blankDates, today, isBlockedFn)]);
     }
   }
   const ymKeys = Object.keys(periods).sort();
   const requestedYm = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('ym');
-  const initialYm = requestedYm && periods[requestedYm] ? requestedYm : ymKeys[ymKeys.length - 1];
+  const initialYm = requestedYm && periods[requestedYm] ? requestedYm : todayYm;
 
   return {
     session: { id: data.id, name: data.name },
@@ -231,7 +235,6 @@ export default function TeacherPage() {
   const [hoursPrefix, setHoursPrefix] = useState('');
   const [hoursSuffix, setHoursSuffix] = useState('');
   // 記住的常用上班時段（開新的空白月份時直接先勾好用）；展示模式不用這個 state，直接即時查 localStorage。
-  const [teacherPattern, setTeacherPattern] = useState<WeeklyPattern | null>(null);
   const [rememberHours, setRememberHours] = useState(true);
   useEffect(() => {
     (async () => {
@@ -243,7 +246,6 @@ export default function TeacherPage() {
         setTeacherStates(prev => ({ ...prev, [session.id]: state }));
         setHoursPrefix(result.hoursPrefix);
         setHoursSuffix(result.hoursSuffix);
-        setTeacherPattern(result.weeklyPattern);
         switchTeacher(session.id);
       }
       setAuthChecked(true);
@@ -362,12 +364,8 @@ export default function TeacherPage() {
   const dates = useMemo(() => datesBetween(ymFrom(curYm), ymEnd(curYm)), [curYm]);
   const ymKeys = Object.keys(periods).sort();
   const lastYm = ymKeys[ymKeys.length - 1];
-  // 老師可以一直往未來排、不限一次只能看一個月之後，所以這份「全部日期」要跟著目前排到多遠一起長大，
-  // 「固定會議時間」「快速排休」這類一次調整一段日期的功能才不會因為範圍太小而對遠的月份沒反應。
-  const allDates = useMemo(() => {
-    const endYm = lastYm > '2027-03' ? nextYm(lastYm) : '2027-03';
-    return datesBetween('2026-10-01', ymEnd(endYm));
-  }, [lastYm]);
+  // 管理畫面固定只顯示本月＋下個月，批次調整也只作用在這兩個月。
+  const allDates = useMemo(() => datesBetween(ymFrom(ymKeys[0]), ymEnd(lastYm)), [ymKeys, lastYm]);
 
   // 展示模式：學生用邀請連結填名字加入後，資料存在 localStorage；這裡把目前老師底下新加入的學生併進名單。
   // 也監聽 storage 事件，這樣學生在別的分頁加入時，老師這頁不用手動重新整理也能看到（同一瀏覽器才看得到）。
@@ -540,22 +538,6 @@ export default function TeacherPage() {
   }, [teacherAvailability, dates, hasTeacherHours]);
 
   // ---------- 月份切換 ----------
-  // 切到還沒出現過的下個月：狀態是「尚未開放」，這時候還不該有任何上班時段
-  // （有時段就代表已經開放學生選課了，兩者要一致）。上班時段留空，等老師自己
-  // 進「編輯時段」設定、按「完成選取／開放選課」，那一刻才會同時有時段、也真的開放。
-  function createUpcomingMonth() {
-    const nx = nextYm(lastYm);
-    setPeriods(p => ({ ...p, [nx]: { status: 'upcoming', lessons: [], unassigned: [], notified: false, log: [] } }));
-    selectMonth(nx); setTab('hours');
-    // 開一個全新月份：如果之前記住過常用時段，直接幫忙先勾好，不用等她自己重新點一次。
-    const pattern = realSession ? teacherPattern : getDemoTeacherPattern(currentTeacherId);
-    if (pattern && pattern.length) {
-      const newDates = datesBetween(ymFrom(nx), ymEnd(nx));
-      const additions = applyPatternToBlankMonth(pattern, newDates, today, isBlocked);
-      if (additions.size) setTeacherAvailability(prev => new Set([...prev, ...additions]));
-    }
-  }
-
   // 編輯時段頁最下面「完成選取」：真老師模式下，這個按鈕只負責存時段，不再負責開放——開放是獨立的
   // 開關（見 openPeriod()）。展示模式維持原本的行為不變（存時段第一次順便開放），範圍只收真老師。
   async function confirmHours() {
@@ -569,7 +551,6 @@ export default function TeacherPage() {
       });
       if (!res.ok) { const data = await res.json().catch(() => ({})); setNotice(data?.error || '更新失敗，請稍後再試。'); return false; }
       const data = await res.json().catch(() => ({}));
-      if (rememberHours) setTeacherPattern(deriveWeeklyPattern(teacherAvailability, dates, STARTS));
       // 狀態一律用 API 實際回傳的值更新：'upcoming' 第一次存會變成 'closed'，已經是 closed／
       // collecting 的月份維持原狀，不會因為單純存時段就被改去 'collecting'。
       if (data.status) updatePeriod(curYm, { status: data.status });
@@ -980,11 +961,8 @@ export default function TeacherPage() {
       <button type="button" aria-label="上個月" disabled={ymKeys.indexOf(curYm) === 0} onClick={() => { selectMonth(ymKeys[ymKeys.indexOf(curYm) - 1]); setNotice(''); }}>‹</button>
       <b>{ymLabel(curYm)} <span className="pillt">{periodPillLabel(period.status, filledCount, eligibleStudents.length, period.lessons.length, period.unassigned.length)}</span></b>
       <button type="button" aria-label="下個月"
-        onClick={() => {
-          setNotice('');
-          if (curYm === lastYm) { createUpcomingMonth(); return; }
-          selectMonth(ymKeys[ymKeys.indexOf(curYm) + 1]);
-        }}>›</button>
+        disabled={ymKeys.indexOf(curYm) === ymKeys.length - 1}
+        onClick={() => { setNotice(''); selectMonth(ymKeys[ymKeys.indexOf(curYm) + 1]); }}>›</button>
     </div>
 
     {/* ---- 開放／關閉這個月收集時段的開關：只有真老師模式有、而且只能在還沒排課前切換 ----
