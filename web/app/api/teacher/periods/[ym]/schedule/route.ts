@@ -21,7 +21,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ ym: st
 
   const [{ data: students }, { data: teacherSlots }] = await Promise.all([
     supabase.from('students').select('id,name').eq('teacher_id', session.id),
-    supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id),
+    // 只看目前排課月份。老師其他月份即使有上班時段，也不能讓這個完全空白的月份通過排課檢查。
+    supabase.from('slots').select('date,start_min').eq('owner_type', 'teacher').eq('owner_id', session.id)
+      .gte('date', ymFrom(ym)).lte('date', ymEnd(ym)),
   ]);
   // 老師把上班時段全部取消掉（例如改時段時手滑清空）卻忘記重設，這時候排課只會把每個人都排成
   // 「待補」，看起來像排課失敗，其實是還沒設定時段——直接擋下、提醒她回去設定，比排一堆待補清楚。

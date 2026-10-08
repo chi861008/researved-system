@@ -467,6 +467,9 @@ export default function TeacherPage() {
   }
 
   const monthCount = (sel: Set<string>) => [...sel].filter(k => k.startsWith(curYm)).length;
+  // teacherAvailability 會同時保留多個月份的資料，所以不能用整個 Set 的 size 判斷目前月份
+  // 是否有設定上班時段。否則老師只要其他月份曾經排過班，本月全空仍會被放行自動排課。
+  const hasTeacherHours = monthCount(teacherAvailability) > 0;
   const filled = (st: DemoStudent) => [...(studentAvailability.get(st.id) ?? [])].some(k => k.startsWith(curYm));
 
   function setStudentSel(id: string, next: Set<string>) {
@@ -502,12 +505,12 @@ export default function TeacherPage() {
   // 「完全還沒設定」跟「某幾天刻意排休、其他天正常上班」是兩回事，前者才顯示這句提示文字
   // （後面很多地方靠比對這個字串決定要不要顯示分享按鈕），後者要讓 wholeWeekdaysOff 顯示「不上班」。
   const hoursSummaryText = useMemo(() => {
-    if (teacherAvailability.size === 0) return '這個月還沒有設定上班時段';
+    if (!hasTeacherHours) return '這個月還沒有設定上班時段';
     const a = analyzeWeeklyPattern(teacherAvailability, dates, STARTS, L, true);
     return a.runs.map(r => `${r.dayLabel} ${r.windowLabel}`).join('\n') +
       (a.off.length ? `\n休假：${a.off.map(md).join('、')}` : '') +
       (a.changed.length ? `\n調整：${a.changed.join('、')}` : '');
-  }, [teacherAvailability, dates]);
+  }, [teacherAvailability, dates, hasTeacherHours]);
 
   // ---------- 月份切換 ----------
   // 切到還沒出現過的下個月：狀態是「尚未開放」，這時候還不該有任何上班時段
@@ -580,7 +583,7 @@ export default function TeacherPage() {
         // 是從上班時段算出來的，開關本身跟時段內容無關，這裡開了但時段還空著的話，分享卡只會讓她
         // 把一段「本月無上班」的誤導訊息傳給學生。改成一句平實的提示，時段空的話順便提醒她去設定。
         setNotice(`已開放 ${+curYm.slice(5)} 月選課，學生現在可以開始填寫時段了。`
-          + (teacherAvailability.size === 0 ? '記得去設定上班時段，不然學生進來會看到空的。' : ''));
+          + (!hasTeacherHours ? '記得去設定上班時段，不然學生進來會看到空的。' : ''));
       } else {
         setNotice(`已關閉 ${+curYm.slice(5)} 月的收集，學生暫時看不到這個月的選課畫面。`);
       }
@@ -659,7 +662,7 @@ export default function TeacherPage() {
     if (!allFilled || scheduling) return;
     // 老師把上班時段全部清空了卻忘記重設（例如改時段手滑清空）：排課只會把每個人都排成「待補」，
     // 看起來像排課失敗，其實是還沒設定時段——直接擋下、提醒她回去設定，不要讓她誤以為排課壞了。
-    if (teacherAvailability.size === 0) { setNotice('這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。'); return; }
+    if (!hasTeacherHours) { setNotice('這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。'); return; }
     setScheduling(true);
     try {
       // 排課失敗（例如伺服器錯誤）就留在「自動排課」這一欄讓她重試，不要跳到還是空的「確認課表」，
@@ -1028,6 +1031,9 @@ export default function TeacherPage() {
               {!allFilled && students.length > 0 && (
                 <p className="hint" style={{ marginTop: 8 }}>還有 {students.length - filledCount} 位沒填寫，全部填完才能自動排課。</p>
               )}
+              {allFilled && !hasTeacherHours && (
+                <p className="warn" style={{ marginTop: 8 }}>這個月還沒有設定上班時段，請先到「上班時間」設定後再排課。</p>
+              )}
               <button className="m" style={{ width: '100%', background: 'none', border: 0, marginTop: 10, fontWeight: 700, cursor: 'pointer' }} onClick={() => setAddStudentOpen(true)}>
                 ＋ 新增
               </button>
@@ -1057,7 +1063,7 @@ export default function TeacherPage() {
               <p className="hint" style={{ marginTop: 8 }}>這個月已經排過課了，要重新排課請到下面「確認課表」按「重新排課」。</p>
             )}
             <button className="btn pri" style={{ width: '100%', marginTop: 10 }}
-              disabled={!allFilled || scheduling || period.status === 'draft' || period.status === 'approved' || period.status === 'notified'}
+              disabled={!allFilled || !hasTeacherHours || scheduling || period.status === 'draft' || period.status === 'approved' || period.status === 'notified'}
               onClick={runAutoSchedule}>{scheduling ? '排課中…' : '自動排課'}</button>
           </div></div>
 
@@ -1376,4 +1382,3 @@ function SheetView({ sheet, setSheet, names, studentName, currentTeacherName, pe
     </div>
   </>);
 }
-
